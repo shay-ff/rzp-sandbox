@@ -1,9 +1,9 @@
-import { getSession } from "@/lib/session";
+import { getSession } from "../../../lib/session";
 import { NextResponse } from "next/server";
 import Razorpay from "razorpay";
 
-export async function POST(req) {
-  const session = await getSession();
+export async function POST(req : Request) {
+  const session = await getSession() as any;
 
   if (!session.keyId || !session.keySecret) {
     return NextResponse.json({ error: "No credentials in session" }, { status: 401 });
@@ -30,7 +30,7 @@ export async function POST(req) {
 
     const data = await response.json();
     return NextResponse.json({ status: response.status, data });
-  } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json({ error : err.message }, { status: 500 });
   }
 }

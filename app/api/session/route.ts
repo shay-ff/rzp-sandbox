@@ -1,15 +1,15 @@
-import { getSession } from "@/lib/session";
+import { getSession } from "../../../lib/session";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const session = await getSession();
+  const session = await getSession() as any;
   return NextResponse.json({
     keyId: session.keyId || null,
     keySecret: session.keySecret || null,
   });
 }
 
-export async function POST(req) {
+export async function POST(req: Request) {
   const { keyId, keySecret } = await req.json();
   const session = await getSession();
   session.keyId = keyId;

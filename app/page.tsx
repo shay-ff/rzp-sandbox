@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { endpointGroups } from "@/lib/endpoint";
+import { endpointGroups, Endpoint, EndpointGroup } from "@/lib/endpoint";
 
 export default function Home() {
   const [keyId, setKeyId] = useState("");
@@ -12,18 +12,27 @@ export default function Home() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [urlValues, setUrlValues] = useState<Record<string, string>>({});
   const [bodyValues, setBodyValues] = useState<Record<string, string>>({});
+  const [bodyErrors, setBodyErrors] = useState<Record<string, boolean>>({});
   const [checkoutValues, setCheckoutValues] = useState<Record<string, Record<string, string>>>({});
+  useEffect(() => {
+    fetch("/api/session")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.keyId) { setKeyId(data.keyId); setCredsSaved(true); }
+        if (data.keySecret) setKeySecret(data.keySecret);
+      });
+  }, []);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const bodies = {};
-    const urls = {};
+    const bodies: Record<string, string> = {};
+    const urls: Record<string, string> = {};
     endpointGroups.forEach((g) => {
       g.endpoints.forEach((ep) => {
         if (ep.defaultBody) bodies[ep.id] = JSON.stringify(ep.defaultBody, null, 2);
         if (ep.url) urls[ep.id] = ep.url;
         if (ep.checkoutFields) {
-          const cv = {};
+          const cv: Record<string, string> = {};
           ep.checkoutFields.forEach((f) => (cv[f] = ""));
           setCheckoutValues((p) => ({ ...p, [ep.id]: cv }));
         }
@@ -43,11 +52,11 @@ export default function Home() {
     setCredsSaved(true);
   };
 
-  const toggleGroup = (group) => {
+  const toggleGroup = (group: string) => {
     setOpenGroups((p) => ({ ...p, [group]: !p[group] }));
   };
 
-  const sendRequest = async (ep) => {
+  const sendRequest = async (ep: Endpoint) => {
     setLoading((p) => ({ ...p, [ep.id]: true }));
     setResponses((p) => ({ ...p, [ep.id]: null }));
 
@@ -73,10 +82,10 @@ export default function Home() {
     setLoading((p) => ({ ...p, [ep.id]: false }));
   };
 
-  const openCheckout = (ep) => {
+  const openCheckout = (ep: Endpoint) => {
     const vals = checkoutValues[ep.id] || {};
     const options = {
-      "key": keyId  || "",
+      "key": keyId || "",
       "order_id": vals.order_id || "",
       "customer_id": vals.customer_id || "",
       "recurring": "1",
@@ -97,7 +106,7 @@ export default function Home() {
     rzp.open();
   };
 
-  const METHOD_COLOR = {
+  const METHOD_COLOR: Record<string, string> = {
     GET: "text-green-400 bg-green-400/10 border-green-400/20",
     POST: "text-blue-400 bg-blue-400/10 border-blue-400/20",
     PUT: "text-yellow-400 bg-yellow-400/10 border-yellow-400/20",
@@ -106,7 +115,7 @@ export default function Home() {
     CHECKOUT: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20",
   };
 
-  const STATUS_COLOR = (status) => {
+  const STATUS_COLOR = (status: number | null) => {
     if (!status) return "text-slate-400";
     if (status < 300) return "text-green-400";
     if (status < 500) return "text-yellow-400";
@@ -230,7 +239,7 @@ export default function Home() {
                         <div className="space-y-3">
                           <p className="text-[11px] text-slate-500">Fill fields then open Razorpay checkout</p>
                           <div className="grid grid-cols-2 gap-2">
-                            {ep.checkoutFields.map((field) => (
+                            {(ep.checkoutFields ?? []).map((field) => (
                               <div key={field}>
                                 <label className="text-[10px] text-slate-600 block mb-1">{field}</label>
                                 <input
@@ -279,7 +288,7 @@ export default function Home() {
                                   setSelectedVariants((p) => ({ ...p, [ep.id]: key }));
                                   setBodyValues((p) => ({
                                     ...p,
-                                    [ep.id]: JSON.stringify(ep.defaultBody[key], null, 2),
+                                    [ep.id]: JSON.stringify((ep.defaultBody as Record<string, any>)[key], null, 2),
                                   }));
                                 }}
                                 className="bg-black/30 border border-white/10 rounded px-3 py-2 text-xs text-slate-300 outline-none focus:border-indigo-500/50 transition-colors font-mono w-full"
@@ -292,22 +301,34 @@ export default function Home() {
                           )}
                           {(ep.defaultBody || ep.method === "POST") && (
                             <div>
-                              <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1.5">Body</label>
                               <textarea
                                 rows={Object.keys(ep.defaultBody || {}).length + 3}
                                 value={bodyValues[ep.id] || ""}
                                 onChange={(e) =>
                                   setBodyValues((p) => ({ ...p, [ep.id]: e.target.value }))
                                 }
-                                className="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-xs text-slate-300 outline-none focus:border-indigo-500/50 transition-colors font-mono resize-none"
+                                className={`w-full bg-black/30 border rounded px-3 py-2 text-xs text-slate-300 outline-none transition-colors font-mono resize-none ${bodyErrors[ep.id] ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-indigo-500/50"
+                                  }`}
+                                onBlur={(e) => {
+                                  try {
+                                    JSON.parse(e.target.value);
+                                    setBodyErrors((p) => ({ ...p, [ep.id]: false }));
+                                  } catch {
+                                    setBodyErrors((p) => ({ ...p, [ep.id]: true }));
+                                  }
+                                }}
                               />
+                              {bodyErrors[ep.id] && (
+                                <p className="text-[10px] text-red-400 mt-1">invalid JSON</p>
+                              )}
                             </div>
                           )}
 
                           {/* Send Button */}
                           <button
                             onClick={() => sendRequest(ep)}
-                            disabled={loading[ep.id]}
+                            disabled={loading[ep.id] || !credsSaved}
+                            title={!credsSaved ? "Save credentials first" : ""}
                             className="px-5 py-2 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded hover:bg-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-wait"
                           >
                             {loading[ep.id] ? "sending..." : "Send →"}
@@ -318,6 +339,18 @@ export default function Home() {
                             <div className="mt-2">
                               <div className="flex items-center gap-3 mb-2">
                                 <label className="text-[10px] text-slate-600 tracking-widest uppercase">Response</label>
+                                <button
+                                  onClick={() => setResponses((p) => ({ ...p, [ep.id]: null }))}
+                                  className="ml-auto text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
+                                >
+                                  ✕ clear
+                                </button>
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(JSON.stringify(responses[ep.id].data || responses[ep.id], null, 2))}
+                                  className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
+                                >
+                                  copy
+                                </button>
                                 {responses[ep.id].status && (
                                   <span className={`text-[10px] font-bold ${STATUS_COLOR(responses[ep.id].status)}`}>
                                     {responses[ep.id].status}

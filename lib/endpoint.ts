@@ -1,4 +1,20 @@
-export const endpointGroups = [
+export interface Endpoint {
+  id: string;
+  label: string;
+  method: string;
+  url: string | null;
+  params?: string[];
+  defaultBody?: Record<string, any>;
+  checkoutFields?: string[];
+  variants?: { label: string; key: string }[];
+}
+
+export interface EndpointGroup {
+  group: string;
+  numbered?: boolean;
+  endpoints: Endpoint[];
+}
+export const endpointGroups: EndpointGroup[] = [
     {
         group: "Order API",
         endpoints: [
