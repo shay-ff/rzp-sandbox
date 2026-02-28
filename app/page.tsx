@@ -131,7 +131,7 @@ export default function Home() {
         <div className="px-5 py-4 border-b border-white/5">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-xs font-bold">⚡</div>
-            <span className="text-sm font-semibold text-indigo-300 tracking-wide">RZP TOOL</span>
+            <span className="text-sm font-semibold text-indigo-300 tracking-wide">RZP Sandbox</span>
           </div>
         </div>
 
