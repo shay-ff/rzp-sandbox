@@ -16,6 +16,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Razorpay API Sandbox",
   description: "A sandbox environment to test Razorpay APIs and integrate with the Razorpay Checkout form.",
+  icons: {
+    icon: "/razorpay-icon.webp",
+    shortcut: "/razorpay-icon.webp",
+    apple: "/razorpay-icon.webp",
+  },
 };
 
 export default function RootLayout({
