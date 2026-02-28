@@ -329,7 +329,7 @@ export default function Home() {
                             onClick={() => sendRequest(ep)}
                             disabled={loading[ep.id] || !credsSaved}
                             title={!credsSaved ? "Save credentials first" : ""}
-                            className="px-5 py-2 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded hover:bg-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-wait"
+                            className={`px-5 py-2 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded hover:bg-indigo-500/30 transition-all disabled:opacity-50 ${loading[ep.id] ? "cursor-wait" : !credsSaved ? "cursor-not-allowed" : ""}`}
                           >
                             {loading[ep.id] ? "sending..." : "Send →"}
                           </button>
