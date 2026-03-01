@@ -5,6 +5,7 @@ import { endpointGroups, Endpoint, EndpointGroup } from "@/lib/endpoint";
 
 export default function Home() {
   const [keyId, setKeyId] = useState("");
+  const [credError, setCredError] = useState("");
   const [keySecret, setKeySecret] = useState("");
   const [credsSaved, setCredsSaved] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -14,6 +15,7 @@ export default function Home() {
   const [bodyValues, setBodyValues] = useState<Record<string, string>>({});
   const [bodyErrors, setBodyErrors] = useState<Record<string, boolean>>({});
   const [checkoutValues, setCheckoutValues] = useState<Record<string, Record<string, string>>>({});
+  
   useEffect(() => {
     fetch("/api/session")
       .then((r) => r.json())
@@ -44,12 +46,18 @@ export default function Home() {
 
   const saveCredentials = async () => {
     if (!keyId || !keySecret) return;
+    if(!keyId.startsWith("rzp_test_") && !keyId.startsWith("rzp_live_")) {
+      setCredError("Key ID should start with 'rzp_test_' or 'rzp_live_'");
+      return;
+    }
+    setCredError("");
     await fetch("/api/session", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ keyId, keySecret }),
     });
     setCredsSaved(true);
+
   };
 
   const toggleGroup = (group: string) => {
@@ -160,6 +168,8 @@ export default function Home() {
           >
             {credsSaved ? "✓ saved" : "save to session"}
           </button>
+          {credError && <p className="text-[10px] text-red-400 mt-1">{credError}</p>
+          }
         </div>
 
         {/* Nav Groups */}
