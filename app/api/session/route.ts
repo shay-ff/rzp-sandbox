@@ -17,3 +17,11 @@ export async function POST(req: Request) {
   await session.save();
   return NextResponse.json({ success: true });
 }
+
+export async function DELETE() {
+  const session = await getSession();
+  delete session.keyId;
+  delete session.keySecret;
+  await session.save();
+  return NextResponse.json({ success: true });
+}

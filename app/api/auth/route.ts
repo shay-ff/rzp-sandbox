@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     res.cookies.set("rzp-authed", "true", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 60 * 1, // 8 hours
+      maxAge: 60 * 60 * 1, // 1 hours
       path: "/",
     });
     return res;

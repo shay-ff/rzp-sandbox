@@ -28,8 +28,26 @@ export async function POST(req : Request) {
       ...(method !== "GET" && { body: JSON.stringify(body) }),
     });
 
-    const data = await response.json();
-    return NextResponse.json({ status: response.status, data });
+    const contentType = response.headers.get("content-type") || "";
+    const isJsonResponse = contentType.includes("application/json");
+
+    if (isJsonResponse) {
+      const data = await response.json();
+      return NextResponse.json({
+        status: response.status,
+        contentType,
+        isJson: true,
+        data,
+      });
+    }
+
+    const text = await response.text();
+    return NextResponse.json({
+      status: response.status,
+      contentType,
+      isJson: false,
+      raw: text,
+    });
   } catch (err: any) {
     return NextResponse.json({ error : err.message }, { status: 500 });
   }

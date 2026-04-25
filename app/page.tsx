@@ -5,6 +5,7 @@ import { endpointGroups, Endpoint, EndpointGroup } from "@/lib/endpoint";
 
 export default function Home() {
   const [keyId, setKeyId] = useState("");
+  const [showSecret, setShowSecret] = useState(false);
   const [credError, setCredError] = useState("");
   const [keySecret, setKeySecret] = useState("");
   const [credsSaved, setCredsSaved] = useState(false);
@@ -14,6 +15,8 @@ export default function Home() {
   const [urlValues, setUrlValues] = useState<Record<string, string>>({});
   const [bodyValues, setBodyValues] = useState<Record<string, string>>({});
   const [bodyErrors, setBodyErrors] = useState<Record<string, boolean>>({});
+  const [curlStatus, setCurlStatus] = useState<Record<string, string>>({});
+  const [responseViewMode, setResponseViewMode] = useState<Record<string, "json" | "raw">>({});
   const [checkoutValues, setCheckoutValues] = useState<Record<string, Record<string, string>>>({});
   
   useEffect(() => {
@@ -60,6 +63,15 @@ export default function Home() {
 
   };
 
+  const clearCredentials = async () => {
+    await fetch("/api/session", { method: "DELETE" });
+    setKeyId("");
+    setKeySecret("");
+    setCredError("");
+    setCredsSaved(false);
+    setShowSecret(false);
+  };
+
   const toggleGroup = (group: string) => {
     setOpenGroups((p) => ({ ...p, [group]: !p[group] }));
   };
@@ -67,6 +79,7 @@ export default function Home() {
   const sendRequest = async (ep: Endpoint) => {
     setLoading((p) => ({ ...p, [ep.id]: true }));
     setResponses((p) => ({ ...p, [ep.id]: null }));
+    setResponseViewMode((p) => ({ ...p, [ep.id]: "json" }));
 
     let body = null;
     if (bodyValues[ep.id]) {
@@ -87,7 +100,60 @@ export default function Home() {
 
     const data = await res.json();
     setResponses((p) => ({ ...p, [ep.id]: data }));
+    if (data && data.isJson === false) {
+      setResponseViewMode((p) => ({ ...p, [ep.id]: "raw" }));
+    }
     setLoading((p) => ({ ...p, [ep.id]: false }));
+  };
+
+  const shellEscape = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
+
+  const buildCurlCommand = (ep: Endpoint) => {
+    const url = (urlValues[ep.id] || ep.url || "").trim();
+    if (!url) throw new Error("URL is required");
+
+    const parts = ["curl", "-X", ep.method, shellEscape(url)];
+
+    if (keyId || keySecret) {
+      parts.push("-u", shellEscape(`${keyId}:${keySecret}`));
+    }
+
+    const rawBody = (bodyValues[ep.id] || "").trim();
+    if (rawBody) {
+      const parsedBody = JSON.parse(rawBody);
+      parts.push("-H", shellEscape("Content-Type: application/json"));
+      parts.push("--data-raw", shellEscape(JSON.stringify(parsedBody)));
+    }
+
+    return parts.join(" ");
+  };
+
+  const copyCurl = async (ep: Endpoint) => {
+    try {
+      const command = buildCurlCommand(ep);
+      await navigator.clipboard.writeText(command);
+      setCurlStatus((p) => ({ ...p, [ep.id]: "copied" }));
+    } catch {
+      setCurlStatus((p) => ({ ...p, [ep.id]: "invalid payload" }));
+    }
+  };
+
+  const getResponseCopyText = (response: any) => {
+    if (response?.isJson === false) {
+      return String(response.raw || "");
+    }
+    return JSON.stringify(response?.data || response, null, 2);
+  };
+
+  const getResponseDisplayText = (epId: string, response: any) => {
+    const mode = responseViewMode[epId] || "json";
+    if (mode === "raw") {
+      if (response?.isJson === false) {
+        return String(response.raw || "");
+      }
+      return JSON.stringify(response?.data || response, null, 2);
+    }
+    return JSON.stringify(response?.data || response, null, 2);
   };
 
   const openCheckout = (ep: Endpoint) => {
@@ -153,21 +219,38 @@ export default function Home() {
             className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 outline-none focus:border-indigo-500/50 transition-colors"
           />
           <input
-            type="password"
+            type={showSecret ? "text" : "password"}
             placeholder="Key Secret"
             value={keySecret}
             onChange={(e) => setKeySecret(e.target.value)}
             className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 outline-none focus:border-indigo-500/50 transition-colors"
           />
-          <button
-            onClick={saveCredentials}
-            className={`w-full py-1.5 rounded text-xs font-semibold tracking-wide transition-all ${credsSaved
-              ? "bg-green-500/10 border border-green-500/20 text-green-400"
-              : "bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/30"
-              }`}
-          >
-            {credsSaved ? "✓ saved" : "save to session"}
-          </button>
+          <label className="flex items-center gap-2 text-[10px] text-slate-500 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showSecret}
+              onChange={(e) => setShowSecret(e.target.checked)}
+              className="accent-indigo-500"
+            />
+            Show secret
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={saveCredentials}
+              className={`w-full py-1.5 rounded text-xs font-semibold tracking-wide transition-all ${credsSaved
+                ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                : "bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/30"
+                }`}
+            >
+              {credsSaved ? "✓ saved" : "save"}
+            </button>
+            <button
+              onClick={clearCredentials}
+              className="w-full py-1.5 rounded text-xs font-semibold tracking-wide transition-all bg-red-500/10 border border-red-500/20 text-red-300 hover:bg-red-500/20"
+            >
+              clear
+            </button>
+          </div>
           {credError && <p className="text-[10px] text-red-400 mt-1">{credError}</p>
           }
         </div>
@@ -334,21 +417,58 @@ export default function Home() {
                             </div>
                           )}
 
-                          {/* Send Button */}
-                          <button
-                            onClick={() => sendRequest(ep)}
-                            disabled={loading[ep.id] || !credsSaved}
-                            title={!credsSaved ? "Save credentials first" : ""}
-                            className={`px-5 py-2 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded hover:bg-indigo-500/30 transition-all disabled:opacity-50 ${loading[ep.id] ? "cursor-wait" : !credsSaved ? "cursor-not-allowed" : ""}`}
-                          >
-                            {loading[ep.id] ? "sending..." : "Send →"}
-                          </button>
+                          {/* Actions */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => sendRequest(ep)}
+                              disabled={loading[ep.id] || !credsSaved}
+                              title={!credsSaved ? "Save credentials first" : ""}
+                              className={`px-5 py-2 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded hover:bg-indigo-500/30 transition-all disabled:opacity-50 ${loading[ep.id] ? "cursor-wait" : !credsSaved ? "cursor-not-allowed" : ""}`}
+                            >
+                              {loading[ep.id] ? "sending..." : "Send →"}
+                            </button>
+                            <button
+                              onClick={() => copyCurl(ep)}
+                              className="px-3 py-2 bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold rounded hover:bg-white/10 transition-all"
+                            >
+                              Copy cURL
+                            </button>
+                            {curlStatus[ep.id] && (
+                              <span className={`text-[10px] ${curlStatus[ep.id] === "copied" ? "text-green-400" : "text-red-400"}`}>
+                                {curlStatus[ep.id]}
+                              </span>
+                            )}
+                          </div>
 
                           {/* Response */}
                           {responses[ep.id] && (
                             <div className="mt-2">
                               <div className="flex items-center gap-3 mb-2">
                                 <label className="text-[10px] text-slate-600 tracking-widest uppercase">Response</label>
+                                {responses[ep.id].isJson === false && (
+                                  <>
+                                    <button
+                                      onClick={() => setResponseViewMode((p) => ({ ...p, [ep.id]: "raw" }))}
+                                      className={`text-[10px] transition-colors ${
+                                        (responseViewMode[ep.id] || "raw") === "raw"
+                                          ? "text-cyan-300"
+                                          : "text-slate-600 hover:text-slate-400"
+                                      }`}
+                                    >
+                                      raw
+                                    </button>
+                                    <button
+                                      onClick={() => setResponseViewMode((p) => ({ ...p, [ep.id]: "json" }))}
+                                      className={`text-[10px] transition-colors ${
+                                        (responseViewMode[ep.id] || "raw") === "json"
+                                          ? "text-cyan-300"
+                                          : "text-slate-600 hover:text-slate-400"
+                                      }`}
+                                    >
+                                      json wrapper
+                                    </button>
+                                  </>
+                                )}
                                 <button
                                   onClick={() => setResponses((p) => ({ ...p, [ep.id]: null }))}
                                   className="ml-auto text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
@@ -356,7 +476,7 @@ export default function Home() {
                                   ✕ clear
                                 </button>
                                 <button
-                                  onClick={() => navigator.clipboard.writeText(JSON.stringify(responses[ep.id].data || responses[ep.id], null, 2))}
+                                  onClick={() => navigator.clipboard.writeText(getResponseCopyText(responses[ep.id]))}
                                   className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
                                 >
                                   copy
@@ -370,8 +490,13 @@ export default function Home() {
                                   <span className="text-[10px] text-red-400">{responses[ep.id].error}</span>
                                 )}
                               </div>
+                              {responses[ep.id].contentType && (
+                                <p className="text-[10px] text-slate-600 mb-2">
+                                  {responses[ep.id].contentType}
+                                </p>
+                              )}
                               <pre className="bg-black/40 border border-white/5 rounded p-4 text-[11px] text-slate-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                                {JSON.stringify(responses[ep.id].data || responses[ep.id], null, 2)}
+                                {getResponseDisplayText(ep.id, responses[ep.id])}
                               </pre>
                             </div>
                           )}
