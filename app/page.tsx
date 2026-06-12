@@ -3,6 +3,49 @@
 import { useState, useEffect } from "react";
 import { endpointGroups, Endpoint, EndpointGroup } from "@/lib/endpoint";
 
+type RequestHistoryItem = {
+  id: string;
+  endpointId: string;
+  endpointLabel: string;
+  method: string;
+  url: string;
+  requestBody: string | null;
+  response: any;
+  status: number | null;
+  timestamp: string;
+  variantKey?: string;
+};
+
+const REQUEST_HISTORY_STORAGE_KEY = "rzp-sandbox-request-history";
+
+const buildEndpointState = () => {
+  const bodies: Record<string, string> = {};
+  const urls: Record<string, string> = {};
+  const checkoutValues: Record<string, Record<string, string>> = {};
+
+  endpointGroups.forEach((group) => {
+    group.endpoints.forEach((endpoint) => {
+      if (endpoint.defaultBody) {
+        if (endpoint.variants?.length) {
+          const variantKey = endpoint.variants[0].key;
+          bodies[endpoint.id] = JSON.stringify(endpoint.defaultBody[variantKey] ?? endpoint.defaultBody, null, 2);
+        } else {
+          bodies[endpoint.id] = JSON.stringify(endpoint.defaultBody, null, 2);
+        }
+      }
+      if (endpoint.url) urls[endpoint.id] = endpoint.url;
+      if (endpoint.checkoutFields) {
+        checkoutValues[endpoint.id] = endpoint.checkoutFields.reduce<Record<string, string>>((acc, field) => {
+          acc[field] = "";
+          return acc;
+        }, {});
+      }
+    });
+  });
+
+  return { bodies, urls, checkoutValues };
+};
+
 export default function Home() {
   const [keyId, setKeyId] = useState("");
   const [showSecret, setShowSecret] = useState(false);
@@ -18,6 +61,7 @@ export default function Home() {
   const [curlStatus, setCurlStatus] = useState<Record<string, string>>({});
   const [responseViewMode, setResponseViewMode] = useState<Record<string, "json" | "raw">>({});
   const [checkoutValues, setCheckoutValues] = useState<Record<string, Record<string, string>>>({});
+  const [requestHistory, setRequestHistory] = useState<RequestHistoryItem[]>([]);
   
   useEffect(() => {
     fetch("/api/session")
@@ -30,22 +74,37 @@ export default function Home() {
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const bodies: Record<string, string> = {};
-    const urls: Record<string, string> = {};
-    endpointGroups.forEach((g) => {
-      g.endpoints.forEach((ep) => {
-        if (ep.defaultBody) bodies[ep.id] = JSON.stringify(ep.defaultBody, null, 2);
-        if (ep.url) urls[ep.id] = ep.url;
-        if (ep.checkoutFields) {
-          const cv: Record<string, string> = {};
-          ep.checkoutFields.forEach((f) => (cv[f] = ""));
-          setCheckoutValues((p) => ({ ...p, [ep.id]: cv }));
-        }
-      });
-    });
+    try {
+      const stored = window.sessionStorage.getItem(REQUEST_HISTORY_STORAGE_KEY);
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) setRequestHistory(parsed);
+    } catch {
+      window.sessionStorage.removeItem(REQUEST_HISTORY_STORAGE_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(REQUEST_HISTORY_STORAGE_KEY, JSON.stringify(requestHistory));
+  }, [requestHistory]);
+
+  useEffect(() => {
+    if (!keyId) return;
+    setCheckoutValues((p) => ({
+      ...p,
+      caw_checkout: {
+        ...(p.caw_checkout || {}),
+        key: keyId,
+      },
+    }));
+  }, [keyId]);
+
+  useEffect(() => {
+    const { bodies, urls, checkoutValues } = buildEndpointState();
     setBodyValues(bodies);
     setUrlValues(urls);
-  }, []);
+    setCheckoutValues(checkoutValues);
+  }, [endpointGroups]);
 
   const saveCredentials = async () => {
     if (!keyId || !keySecret) return;
@@ -70,10 +129,28 @@ export default function Home() {
     setCredError("");
     setCredsSaved(false);
     setShowSecret(false);
+    setCheckoutValues((p) => ({
+      ...p,
+      caw_checkout: {
+        ...(p.caw_checkout || {}),
+        key: "",
+      },
+    }));
   };
 
   const toggleGroup = (group: string) => {
     setOpenGroups((p) => ({ ...p, [group]: !p[group] }));
+  };
+
+  const clearRequestHistory = () => {
+    setRequestHistory([]);
+  };
+
+  const createHistoryId = () => {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   };
 
   const sendRequest = async (ep: Endpoint) => {
@@ -81,29 +158,63 @@ export default function Home() {
     setResponses((p) => ({ ...p, [ep.id]: null }));
     setResponseViewMode((p) => ({ ...p, [ep.id]: "json" }));
 
-    let body = null;
-    if (bodyValues[ep.id]) {
-      try {
-        body = JSON.parse(bodyValues[ep.id]);
-      } catch {
-        setResponses((p) => ({ ...p, [ep.id]: { error: "Invalid JSON in body" } }));
-        setLoading((p) => ({ ...p, [ep.id]: false }));
-        return;
+    const requestBodyText = bodyValues[ep.id] || "";
+
+    try {
+      let body = null;
+      if (requestBodyText) {
+        body = JSON.parse(requestBodyText);
       }
-    }
 
-    const res = await fetch("/api/rzp", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method: ep.method, url: urlValues[ep.id] || ep.url, body }),
-    });
+      const url = urlValues[ep.id] || ep.url || "";
+      const res = await fetch("/api/rzp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method: ep.method, url, body }),
+      });
 
-    const data = await res.json();
-    setResponses((p) => ({ ...p, [ep.id]: data }));
-    if (data && data.isJson === false) {
-      setResponseViewMode((p) => ({ ...p, [ep.id]: "raw" }));
+      const data = await res.json();
+      setResponses((p) => ({ ...p, [ep.id]: data }));
+      if (data && data.isJson === false) {
+        setResponseViewMode((p) => ({ ...p, [ep.id]: "raw" }));
+      }
+
+      setRequestHistory((p) => [
+        ...p,
+        {
+          id: createHistoryId(),
+          endpointId: ep.id,
+          endpointLabel: ep.label,
+          method: ep.method,
+          url,
+          requestBody: requestBodyText.trim() || null,
+          response: data,
+          status: res.status,
+          timestamp: new Date().toISOString(),
+          variantKey: selectedVariants[ep.id],
+        },
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Request failed";
+      setResponses((p) => ({ ...p, [ep.id]: { error: message } }));
+      setRequestHistory((p) => [
+        ...p,
+        {
+          id: createHistoryId(),
+          endpointId: ep.id,
+          endpointLabel: ep.label,
+          method: ep.method,
+          url: urlValues[ep.id] || ep.url || "",
+          requestBody: requestBodyText.trim() || null,
+          response: { error: message },
+          status: null,
+          timestamp: new Date().toISOString(),
+          variantKey: selectedVariants[ep.id],
+        },
+      ]);
+    } finally {
+      setLoading((p) => ({ ...p, [ep.id]: false }));
     }
-    setLoading((p) => ({ ...p, [ep.id]: false }));
   };
 
   const shellEscape = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
@@ -194,6 +305,11 @@ export default function Home() {
     if (status < 300) return "text-green-400";
     if (status < 500) return "text-yellow-400";
     return "text-red-400";
+  };
+
+  const formatHistoryResponse = (response: any) => {
+    if (response?.error) return response.error;
+    return JSON.stringify(response, null, 2);
   };
 
   return (
@@ -392,7 +508,7 @@ export default function Home() {
                               </select>
                             </div>
                           )}
-                          {(ep.defaultBody || ep.method === "POST") && (
+                          {(ep.defaultBody || (ep.method === "POST" && !ep.hideBody)) && (
                             <div>
                               <textarea
                                 rows={Object.keys(ep.defaultBody || {}).length + 3}
@@ -508,6 +624,76 @@ export default function Home() {
               </div>
             </section>
           ))}
+
+          <section>
+            <div className="flex items-center gap-3 mb-6">
+              <h2 className="text-xs tracking-widest text-slate-500 uppercase">Session History</h2>
+              <span className="text-[10px] bg-slate-500/10 border border-slate-500/20 text-slate-400 px-2 py-0.5 rounded-full">
+                {requestHistory.length} requests
+              </span>
+              <button
+                onClick={clearRequestHistory}
+                disabled={!requestHistory.length}
+                className="ml-auto text-[10px] text-slate-500 hover:text-slate-300 transition-colors disabled:opacity-40"
+              >
+                clear history
+              </button>
+              <div className="flex-1 h-px bg-white/5" />
+            </div>
+
+            {requestHistory.length ? (
+              <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
+                {requestHistory.slice().reverse().map((item) => (
+                  <div key={item.id} className="border border-white/5 rounded-lg bg-[#0d0d18] overflow-hidden">
+                    <div className="px-5 py-3 border-b border-white/5 flex flex-wrap items-center gap-3">
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${METHOD_COLOR[item.method] || "text-slate-300 bg-white/5 border-white/10"}`}>
+                        {item.method}
+                      </span>
+                      <span className="text-xs text-slate-300 font-semibold">{item.endpointLabel}</span>
+                      {item.variantKey && (
+                        <span className="text-[10px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">
+                          {item.variantKey}
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-bold ${STATUS_COLOR(item.status)}`}>
+                        {item.status ?? "failed"}
+                      </span>
+                      <span className="ml-auto text-[10px] text-slate-600">
+                        {new Date(item.timestamp).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="p-5 space-y-4">
+                      <div>
+                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1.5">URL</label>
+                        <p className="text-xs text-slate-300 break-all font-mono">{item.url || "-"}</p>
+                      </div>
+
+                      {item.requestBody && (
+                        <div>
+                          <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1.5">Request Body</label>
+                          <pre className="bg-black/40 border border-white/5 rounded p-4 text-[11px] text-slate-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                            {item.requestBody}
+                          </pre>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1.5">Response</label>
+                        <pre className="bg-black/40 border border-white/5 rounded p-4 text-[11px] text-slate-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                          {formatHistoryResponse(item.response)}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="border border-dashed border-white/10 rounded-lg bg-[#0d0d18] px-5 py-8 text-sm text-slate-500">
+                No API requests have been recorded in this session yet.
+              </div>
+            )}
+          </section>
         </div>
       </main>
     </div>
