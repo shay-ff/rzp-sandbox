@@ -1,6 +1,6 @@
-# Sanbox
+# Sandbox
 
-Simple Next.js app.
+Simple Next.js app for Razorpay API Sandbox Setup.
 
 ## Run
 
@@ -16,3 +16,4 @@ Open: `http://localhost:3000`
 - `/`
 - `/api/session`
 - `/api/rzp`
+- `/api/session/history`
