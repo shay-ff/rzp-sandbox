@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { endpointGroups, Endpoint } from "@/lib/endpoint";
 import type { RequestHistoryEntry } from "@/lib/history";
+import { Analytics } from '@vercel/analytics/next';
 
 const ENDPOINT_METHOD_FILTERS = ["ALL", "GET", "POST", "PUT", "PATCH", "DELETE", "CHECKOUT"] as const;
 const HISTORY_GROUPING_OPTIONS = ["group", "method"] as const;
