@@ -1,22 +1,40 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { endpointGroups, Endpoint, EndpointGroup } from "@/lib/endpoint";
+import { endpointGroups, Endpoint } from "@/lib/endpoint";
+import type { RequestHistoryEntry } from "@/lib/history";
 
-type RequestHistoryItem = {
-  id: string;
-  endpointId: string;
-  endpointLabel: string;
-  method: string;
-  url: string;
-  requestBody: string | null;
-  response: any;
-  status: number | null;
-  timestamp: string;
-  variantKey?: string;
+const ENDPOINT_METHOD_FILTERS = ["ALL", "GET", "POST", "PUT", "PATCH", "DELETE", "CHECKOUT"] as const;
+const HISTORY_GROUPING_OPTIONS = ["group", "method"] as const;
+
+type EndpointMethodFilter = (typeof ENDPOINT_METHOD_FILTERS)[number];
+type HistoryGrouping = (typeof HISTORY_GROUPING_OPTIONS)[number];
+type RequestHistoryItem = RequestHistoryEntry;
+
+const endpointMetaById = endpointGroups.reduce<Record<string, { group: string }>>((acc, group) => {
+  group.endpoints.forEach((endpoint) => {
+    acc[endpoint.id] = { group: group.group };
+  });
+  return acc;
+}, {});
+
+const truncateText = (value: string, limit: number) => (value.length <= limit ? value : `${value.slice(0, limit - 1)}…`);
+
+const safeJsonStringify = (value: unknown) => {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
 };
 
-const REQUEST_HISTORY_STORAGE_KEY = "rzp-sandbox-request-history";
+const normalizeJsonText = (value: string) => {
+  try {
+    return JSON.stringify(JSON.parse(value));
+  } catch {
+    return null;
+  }
+};
 
 const buildEndpointState = () => {
   const bodies: Record<string, string> = {};
@@ -64,6 +82,12 @@ export default function Home() {
   const [requestHistory, setRequestHistory] = useState<RequestHistoryItem[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const [endpointSearch, setEndpointSearch] = useState("");
+  const [endpointMethodFilter, setEndpointMethodFilter] = useState<EndpointMethodFilter>("ALL");
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyGrouping, setHistoryGrouping] = useState<HistoryGrouping>("group");
+  const [historyMethodFilter, setHistoryMethodFilter] = useState<EndpointMethodFilter>("ALL");
+  const [collapsedHistoryGroups, setCollapsedHistoryGroups] = useState<Record<string, boolean>>({});
   
   useEffect(() => {
     fetch("/api/session")
@@ -76,19 +100,12 @@ export default function Home() {
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    try {
-      const stored = window.sessionStorage.getItem(REQUEST_HISTORY_STORAGE_KEY);
-      if (!stored) return;
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed)) setRequestHistory(parsed);
-    } catch {
-      window.sessionStorage.removeItem(REQUEST_HISTORY_STORAGE_KEY);
-    }
+    fetch("/api/session/history")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.history)) setRequestHistory(data.history);
+      });
   }, []);
-
-  useEffect(() => {
-    window.sessionStorage.setItem(REQUEST_HISTORY_STORAGE_KEY, JSON.stringify(requestHistory));
-  }, [requestHistory]);
 
   useEffect(() => {
     if (!keyId) return;
@@ -107,6 +124,97 @@ export default function Home() {
     setUrlValues(urls);
     setCheckoutValues(checkoutValues);
   }, [endpointGroups]);
+
+  const getEndpointDefaultBodyText = (endpoint: Endpoint) => {
+    if (!endpoint.defaultBody) return "";
+    if (endpoint.variants?.length) {
+      const variantKey = selectedVariants[endpoint.id] || endpoint.variants[0].key;
+      const variantBody = (endpoint.defaultBody as Record<string, any>)[variantKey] ?? endpoint.defaultBody;
+      return safeJsonStringify(variantBody);
+    }
+    return safeJsonStringify(endpoint.defaultBody);
+  };
+
+  const isEndpointBodyDirty = (endpoint: Endpoint) => {
+    const defaultBodyText = getEndpointDefaultBodyText(endpoint).trim();
+    const currentBodyText = (bodyValues[endpoint.id] || "").trim();
+
+    if (!defaultBodyText) return Boolean(currentBodyText);
+    if (!currentBodyText) return true;
+
+    const normalizedCurrent = normalizeJsonText(currentBodyText);
+    const normalizedDefault = normalizeJsonText(defaultBodyText);
+    if (normalizedCurrent && normalizedDefault) {
+      return normalizedCurrent !== normalizedDefault;
+    }
+
+    return currentBodyText !== defaultBodyText;
+  };
+
+  const getCheckoutFieldHint = (field: string) => {
+    switch (field) {
+      case "key":
+        return "Prefilled from the saved session key";
+      case "order_id":
+        return "Paste the order_id from a Create Order response";
+      case "customer_id":
+        return "Paste the customer_id from a saved customer response";
+      case "name":
+        return "Customer name shown in checkout";
+      case "email":
+        return "Receipt and customer email";
+      case "contact":
+        return "Customer phone number";
+      default:
+        return "Required for checkout";
+    }
+  };
+
+  const getResponseRawCopyText = (response: any) => {
+    if (response?.isJson === false) {
+      return String(response.raw || "");
+    }
+    return safeJsonStringify(response?.data || response);
+  };
+
+  const getResponseSummaryText = (response: any) => {
+    if (response?.error) {
+      return `Error: ${response.error}`;
+    }
+
+    const lines: string[] = [];
+    if (typeof response?.status === "number") lines.push(`Status: ${response.status}`);
+    if (response?.contentType) lines.push(`Content-Type: ${response.contentType}`);
+
+    if (response?.isJson === false) {
+      const rawText = String(response.raw || "");
+      lines.push(`Body: ${truncateText(rawText.replace(/\s+/g, " "), 240)}`);
+      return lines.join("\n");
+    }
+
+    const payload = response?.data || response;
+    if (Array.isArray(payload)) {
+      lines.push(`Items: ${payload.length}`);
+      lines.push(`Preview: ${truncateText(safeJsonStringify(payload), 320)}`);
+      return lines.join("\n");
+    }
+
+    if (payload && typeof payload === "object") {
+      const keys = Object.keys(payload);
+      lines.push(`Keys: ${truncateText(keys.join(", "), 140)}`);
+      lines.push(`Preview: ${truncateText(safeJsonStringify(payload), 320)}`);
+      return lines.join("\n");
+    }
+
+    lines.push(`Value: ${String(payload)}`);
+    return lines.join("\n");
+  };
+
+  const getResponsePreviewText = (response: any) => {
+    if (response?.error) return response.error;
+    if (response?.isJson === false) return String(response.raw || "");
+    return safeJsonStringify(response?.data || response);
+  };
 
   const saveCredentials = async () => {
     if (!keyId || !keySecret) return;
@@ -144,8 +252,27 @@ export default function Home() {
     setOpenGroups((p) => ({ ...p, [group]: !p[group] }));
   };
 
-  const clearRequestHistory = () => {
+  const saveRequestHistory = async (entry: RequestHistoryItem) => {
+    const response = await fetch("/api/session/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(entry),
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
+    const data = await response.json();
+    if (Array.isArray(data.history)) {
+      setRequestHistory(data.history);
+    }
+  };
+
+  const clearRequestHistory = async () => {
+    await fetch("/api/session/history", { method: "DELETE" });
     setRequestHistory([]);
+    setExpandedHistoryId(null);
   };
 
   const toggleHistoryRow = (id: string) => {
@@ -185,39 +312,42 @@ export default function Home() {
         setResponseViewMode((p) => ({ ...p, [ep.id]: "raw" }));
       }
 
-      setRequestHistory((p) => [
-        ...p,
-        {
-          id: createHistoryId(),
-          endpointId: ep.id,
-          endpointLabel: ep.label,
-          method: ep.method,
-          url,
-          requestBody: requestBodyText.trim() || null,
-          response: data,
-          status: res.status,
-          timestamp: new Date().toISOString(),
-          variantKey: selectedVariants[ep.id],
-        },
-      ]);
+      const responsePreview = getResponsePreviewText(data);
+      const historyEntry: RequestHistoryItem = {
+        id: createHistoryId(),
+        endpointId: ep.id,
+        endpointLabel: ep.label,
+        endpointGroup: endpointMetaById[ep.id]?.group,
+        method: ep.method,
+        url,
+        requestBody: requestBodyText.trim() || null,
+        responseSummary: getResponseSummaryText(data),
+        responsePreview: truncateText(responsePreview, 1800),
+        responseTruncated: responsePreview.length > 1800,
+        status: res.status,
+        timestamp: new Date().toISOString(),
+        variantKey: selectedVariants[ep.id],
+      };
+
+      await saveRequestHistory(historyEntry);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Request failed";
       setResponses((p) => ({ ...p, [ep.id]: { error: message } }));
-      setRequestHistory((p) => [
-        ...p,
-        {
-          id: createHistoryId(),
-          endpointId: ep.id,
-          endpointLabel: ep.label,
-          method: ep.method,
-          url: urlValues[ep.id] || ep.url || "",
-          requestBody: requestBodyText.trim() || null,
-          response: { error: message },
-          status: null,
-          timestamp: new Date().toISOString(),
-          variantKey: selectedVariants[ep.id],
-        },
-      ]);
+      await saveRequestHistory({
+        id: createHistoryId(),
+        endpointId: ep.id,
+        endpointLabel: ep.label,
+        endpointGroup: endpointMetaById[ep.id]?.group,
+        method: ep.method,
+        url: urlValues[ep.id] || ep.url || "",
+        requestBody: requestBodyText.trim() || null,
+        responseSummary: `Error: ${message}`,
+        responsePreview: message,
+        responseTruncated: false,
+        status: null,
+        timestamp: new Date().toISOString(),
+        variantKey: selectedVariants[ep.id],
+      });
     } finally {
       setLoading((p) => ({ ...p, [ep.id]: false }));
     }
@@ -262,16 +392,6 @@ export default function Home() {
     return JSON.stringify(response?.data || response, null, 2);
   };
 
-  const getResponseDisplayText = (epId: string, response: any) => {
-    const mode = responseViewMode[epId] || "json";
-    if (mode === "raw") {
-      if (response?.isJson === false) {
-        return String(response.raw || "");
-      }
-      return JSON.stringify(response?.data || response, null, 2);
-    }
-    return JSON.stringify(response?.data || response, null, 2);
-  };
 
   const openCheckout = (ep: Endpoint) => {
     const vals = checkoutValues[ep.id] || {};
@@ -313,9 +433,67 @@ export default function Home() {
     return "text-red-400";
   };
 
-  const formatHistoryResponse = (response: any) => {
-    if (response?.error) return response.error;
-    return JSON.stringify(response, null, 2);
+  const filteredEndpointGroups = endpointGroups
+    .map((group) => ({
+      ...group,
+      endpoints: group.endpoints.filter((endpoint) => {
+        const matchesMethod = endpointMethodFilter === "ALL" || endpoint.method === endpointMethodFilter;
+        const searchTerm = endpointSearch.trim().toLowerCase();
+        if (!searchTerm) return matchesMethod;
+
+        const haystack = [
+          endpoint.id,
+          endpoint.label,
+          endpoint.method,
+          group.group,
+          endpoint.url || "",
+          endpoint.variants?.map((variant) => `${variant.label} ${variant.key}`).join(" ") || "",
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        return matchesMethod && haystack.includes(searchTerm);
+      }),
+    }))
+    .filter((group) => group.endpoints.length > 0);
+
+  const filteredHistory = requestHistory.filter((item) => {
+    const searchTerm = historySearch.trim().toLowerCase();
+    const matchesMethod = historyMethodFilter === "ALL" || item.method === historyMethodFilter;
+    if (!searchTerm) return matchesMethod;
+
+    const haystack = [
+      item.endpointId,
+      item.endpointLabel,
+      item.endpointGroup || "",
+      item.method,
+      item.url,
+      item.variantKey || "",
+      item.requestBody || "",
+      item.responseSummary || "",
+      item.responsePreview || "",
+    ].join(" ").toLowerCase();
+
+    return matchesMethod && haystack.includes(searchTerm);
+  });
+
+  const groupedHistory = filteredHistory.reduce<Record<string, RequestHistoryItem[]>>((acc, item) => {
+    const groupKey = historyGrouping === "group" ? item.endpointGroup || "Ungrouped" : item.method;
+    acc[groupKey] = acc[groupKey] || [];
+    acc[groupKey].push(item);
+    return acc;
+  }, {});
+
+  const groupedHistoryEntries = Object.entries(groupedHistory);
+
+
+  const getHistoryGroupLabel = (groupKey: string) =>
+    historyGrouping === "group" ? groupKey : `Method: ${groupKey}`;
+
+  const isHistoryGroupCollapsed = (groupKey: string) => collapsedHistoryGroups[groupKey] ?? false;
+
+  const toggleHistoryGroup = (groupKey: string) => {
+    setCollapsedHistoryGroups((p) => ({ ...p, [groupKey]: !p[groupKey] }));
   };
 
   return (
@@ -414,7 +592,39 @@ export default function Home() {
       {/* Main */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-8 py-10 space-y-16">
-          {endpointGroups.map((g) => (
+          <div className="sticky top-0 z-10 -mx-2 mb-4 rounded-2xl border border-white/5 bg-[#0a0a0f]/90 px-4 py-4 backdrop-blur">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+              <div className="flex-1">
+                <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1">Search endpoints</label>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] text-slate-500 tracking-widest uppercase mr-1">Method</span>
+                {ENDPOINT_METHOD_FILTERS.map((method) => (
+                  <button
+                    key={method}
+                    onClick={() => setEndpointMethodFilter(method)}
+                    className={`rounded-full border px-3 py-1 text-[10px] font-semibold transition-colors ${endpointMethodFilter === method
+                      ? "border-indigo-400/40 bg-indigo-500/15 text-indigo-200"
+                      : "border-white/10 bg-white/5 text-slate-400 hover:border-white/20 hover:text-slate-200"
+                      }`}
+                  >
+                    {method}
+                  </button>
+                ))}
+                <button
+                  onClick={() => {
+                    setEndpointSearch("");
+                    setEndpointMethodFilter("ALL");
+                  }}
+                  className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold text-slate-400 hover:border-white/20 hover:text-slate-200 transition-colors"
+                >
+                  clear filters
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {filteredEndpointGroups.map((g) => (
             <section key={g.group}>
               {/* Group Header */}
               <div className="flex items-center gap-3 mb-6">
@@ -456,7 +666,10 @@ export default function Home() {
                           <div className="grid grid-cols-2 gap-2">
                             {(ep.checkoutFields ?? []).map((field) => (
                               <div key={field}>
-                                <label className="text-[10px] text-slate-600 block mb-1">{field}</label>
+                                <label className="text-[10px] text-slate-600 block mb-1">
+                                  {field}
+                                  {field === "key" && <span className="text-cyan-300"> · prefilled</span>}
+                                </label>
                                 <input
                                   placeholder={field}
                                   value={checkoutValues[ep.id]?.[field] || ""}
@@ -468,6 +681,7 @@ export default function Home() {
                                   }
                                   className="w-full bg-white/5 border border-white/10 rounded px-3 py-1.5 text-xs text-slate-300 placeholder-slate-600 outline-none focus:border-cyan-500/40 transition-colors"
                                 />
+                                <p className="mt-1 text-[10px] text-slate-600">{getCheckoutFieldHint(field)}</p>
                               </div>
                             ))}
                           </div>
@@ -516,13 +730,22 @@ export default function Home() {
                           )}
                           {(ep.defaultBody || (ep.method === "POST" && !ep.hideBody)) && (
                             <div>
+                              {isEndpointBodyDirty(ep) && (
+                                <div className="mb-1.5 inline-flex rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-200">
+                                  modified from default
+                                </div>
+                              )}
                               <textarea
                                 rows={Object.keys(ep.defaultBody || {}).length + 3}
                                 value={bodyValues[ep.id] || ""}
                                 onChange={(e) =>
                                   setBodyValues((p) => ({ ...p, [ep.id]: e.target.value }))
                                 }
-                                className={`w-full bg-black/30 border rounded px-3 py-2 text-xs text-slate-300 outline-none transition-colors font-mono resize-none ${bodyErrors[ep.id] ? "border-red-500/50 focus:border-red-500/70" : "border-white/10 focus:border-indigo-500/50"
+                                className={`w-full bg-black/30 border rounded px-3 py-2 text-xs text-slate-300 outline-none transition-colors font-mono resize-none ${bodyErrors[ep.id]
+                                  ? "border-red-500/50 focus:border-red-500/70"
+                                  : isEndpointBodyDirty(ep)
+                                    ? "border-amber-500/40 focus:border-amber-500/70"
+                                    : "border-white/10 focus:border-indigo-500/50"
                                   }`}
                                 onBlur={(e) => {
                                   try {
@@ -555,6 +778,22 @@ export default function Home() {
                             >
                               Copy cURL
                             </button>
+                            {responses[ep.id] && (
+                              <>
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(getResponseRawCopyText(responses[ep.id]))}
+                                  className="px-3 py-2 bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold rounded hover:bg-white/10 transition-all"
+                                >
+                                  Copy JSON
+                                </button>
+                                <button
+                                  onClick={() => navigator.clipboard.writeText(getResponseSummaryText(responses[ep.id]))}
+                                  className="px-3 py-2 bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold rounded hover:bg-white/10 transition-all"
+                                >
+                                  Copy summary
+                                </button>
+                              </>
+                            )}
                             {curlStatus[ep.id] && (
                               <span className={`text-[10px] ${curlStatus[ep.id] === "copied" ? "text-green-400" : "text-red-400"}`}>
                                 {curlStatus[ep.id]}
@@ -597,12 +836,6 @@ export default function Home() {
                                 >
                                   ✕ clear
                                 </button>
-                                <button
-                                  onClick={() => navigator.clipboard.writeText(getResponseCopyText(responses[ep.id]))}
-                                  className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
-                                >
-                                  copy
-                                </button>
                                 {responses[ep.id].status && (
                                   <span className={`text-[10px] font-bold ${STATUS_COLOR(responses[ep.id].status)}`}>
                                     {responses[ep.id].status}
@@ -618,7 +851,7 @@ export default function Home() {
                                 </p>
                               )}
                               <pre className="bg-black/40 border border-white/5 rounded p-4 text-[11px] text-slate-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                                {getResponseDisplayText(ep.id, responses[ep.id])}
+                                {getResponsePreviewText(responses[ep.id])}
                               </pre>
                             </div>
                           )}
@@ -648,7 +881,7 @@ export default function Home() {
             <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
               <div>
                 <h2 className="text-xs tracking-widest text-slate-400 uppercase">Session History</h2>
-                <p className="text-[10px] text-slate-600">Requests stay in this browser session</p>
+                <p className="text-[10px] text-slate-600">Requests are stored with the saved session</p>
               </div>
               <button
                 onClick={clearRequestHistory}
@@ -665,71 +898,156 @@ export default function Home() {
               </button>
             </div>
 
+            <div className="border-b border-white/5 px-4 py-3">
+              <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+                <div>
+                  <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1">Search history</label>
+                  <input
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    placeholder="Search by endpoint, body, response, or URL"
+                    className="w-full bg-black/30 border border-white/10 rounded px-3 py-2 text-xs text-slate-300 placeholder-slate-600 outline-none focus:border-indigo-500/50 transition-colors font-mono"
+                  />
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+                    {HISTORY_GROUPING_OPTIONS.map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => setHistoryGrouping(option)}
+                        className={`rounded-full px-3 py-1 text-[10px] font-semibold transition-colors ${historyGrouping === option
+                          ? "bg-indigo-500/20 text-indigo-200"
+                          : "text-slate-400 hover:text-slate-200"
+                          }`}
+                      >
+                        {option === "group" ? "Group" : "Method"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {ENDPOINT_METHOD_FILTERS.map((method) => (
+                      <button
+                        key={method}
+                        onClick={() => setHistoryMethodFilter(method)}
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition-colors ${historyMethodFilter === method
+                          ? "border-cyan-400/40 bg-cyan-500/15 text-cyan-200"
+                          : "border-white/10 bg-white/5 text-slate-400 hover:border-white/20 hover:text-slate-200"
+                          }`}
+                      >
+                        {method}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setHistorySearch("");
+                      setHistoryGrouping("group");
+                      setHistoryMethodFilter("ALL");
+                    }}
+                    className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[10px] font-semibold text-slate-400 hover:border-white/20 hover:text-slate-200 transition-colors"
+                  >
+                    clear filters
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="max-h-[70vh] overflow-y-auto p-3">
-              {requestHistory.length ? (
-                <div className="space-y-2">
-                  {requestHistory.slice().reverse().map((item) => {
-                    const isExpanded = expandedHistoryId === item.id;
+              {groupedHistoryEntries.length ? (
+                <div className="space-y-3">
+                  {groupedHistoryEntries.map(([groupKey, items]) => {
+                    const collapsed = isHistoryGroupCollapsed(groupKey);
                     return (
-                      <div key={item.id} className="rounded-xl border border-white/5 bg-[#0d0d18] overflow-hidden">
+                      <div key={groupKey} className="rounded-xl border border-white/5 bg-[#0d0d18] overflow-hidden">
                         <button
-                          onClick={() => toggleHistoryRow(item.id)}
+                          onClick={() => toggleHistoryGroup(groupKey)}
                           className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
                         >
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${METHOD_COLOR[item.method] || "text-slate-300 bg-white/5 border-white/10"}`}>
-                            {item.method}
+                          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-200">
+                            {getHistoryGroupLabel(groupKey)}
                           </span>
-                          <span className="min-w-0 flex-1 truncate text-xs text-slate-200 font-semibold">
-                            {item.endpointLabel}
+                          <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">
+                            {items.length}
                           </span>
-                          {item.variantKey && (
-                            <span className="shrink-0 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-300">
-                              {item.variantKey}
-                            </span>
-                          )}
-                          <span className={`shrink-0 text-[10px] font-bold ${STATUS_COLOR(item.status)}`}>
-                            {item.status ?? "failed"}
-                          </span>
-                          <span className="shrink-0 text-[10px] text-slate-500">{isExpanded ? "−" : "+"}</span>
+                          <span className="shrink-0 text-[10px] text-slate-500">{collapsed ? "▸" : "▾"}</span>
                         </button>
 
-                        {isExpanded && (
-                          <div className="grid gap-px border-t border-white/5 bg-white/5 md:grid-cols-2">
-                            <div className="bg-[#0b0b11] p-4">
-                              <div className="mb-3 flex items-center gap-2">
-                                <span className="text-[10px] tracking-widest text-slate-500 uppercase">Request</span>
-                              </div>
-                              <div className="space-y-3 text-xs text-slate-300">
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">URL</p>
-                                  <p className="break-all font-mono text-[11px] text-slate-300">{item.url || "-"}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Body</p>
-                                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-black/40 p-3 text-[11px] leading-relaxed text-slate-400">
-                                    {item.requestBody || "No body"}
-                                  </pre>
-                                </div>
-                              </div>
-                            </div>
+                        {!collapsed && (
+                          <div className="space-y-2 p-3">
+                            {items.slice().reverse().map((item) => {
+                              const isExpanded = expandedHistoryId === item.id;
+                              return (
+                                <div key={item.id} className="rounded-lg border border-white/5 bg-[#0b0b11] overflow-hidden">
+                                  <button
+                                    onClick={() => toggleHistoryRow(item.id)}
+                                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                                  >
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${METHOD_COLOR[item.method] || "text-slate-300 bg-white/5 border-white/10"}`}>
+                                      {item.method}
+                                    </span>
+                                    <span className="min-w-0 flex-1 truncate text-xs text-slate-200 font-semibold">
+                                      {item.endpointLabel}
+                                    </span>
+                                    {item.variantKey && (
+                                      <span className="shrink-0 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-300">
+                                        {item.variantKey}
+                                      </span>
+                                    )}
+                                    <span className={`shrink-0 text-[10px] font-bold ${STATUS_COLOR(item.status)}`}>
+                                      {item.status ?? "failed"}
+                                    </span>
+                                    <span className="shrink-0 text-[10px] text-slate-500">{isExpanded ? "−" : "+"}</span>
+                                  </button>
 
-                            <div className="bg-[#0b0b11] p-4">
-                              <div className="mb-3 flex items-center gap-2">
-                                <span className="text-[10px] tracking-widest text-slate-500 uppercase">Response</span>
-                              </div>
-                              <div className="space-y-3 text-xs text-slate-300">
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Status</p>
-                                  <p className={`text-[11px] font-bold ${STATUS_COLOR(item.status)}`}>{item.status ?? "failed"}</p>
+                                  {isExpanded && (
+                                    <div className="grid gap-px border-t border-white/5 bg-white/5 md:grid-cols-2">
+                                      <div className="bg-[#0b0b11] p-4">
+                                        <div className="mb-3 flex items-center gap-2">
+                                          <span className="text-[10px] tracking-widest text-slate-500 uppercase">Request</span>
+                                        </div>
+                                        <div className="space-y-3 text-xs text-slate-300">
+                                          <div>
+                                            <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">URL</p>
+                                            <p className="break-all font-mono text-[11px] text-slate-300">{item.url || "-"}</p>
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Body</p>
+                                            <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-black/40 p-3 text-[11px] leading-relaxed text-slate-400">
+                                              {item.requestBody || "No body"}
+                                            </pre>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="bg-[#0b0b11] p-4">
+                                        <div className="mb-3 flex items-center gap-2">
+                                          <span className="text-[10px] tracking-widest text-slate-500 uppercase">Response</span>
+                                          {item.responseTruncated && (
+                                            <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-200">
+                                              truncated
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="space-y-3 text-xs text-slate-300">
+                                          <div>
+                                            <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Summary</p>
+                                            <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-black/40 p-3 text-[11px] leading-relaxed text-slate-400">
+                                              {item.responseSummary}
+                                            </pre>
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Preview</p>
+                                            <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-black/40 p-3 text-[11px] leading-relaxed text-slate-400">
+                                              {item.responsePreview}
+                                            </pre>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                                <div>
-                                  <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Payload</p>
-                                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-black/40 p-3 text-[11px] leading-relaxed text-slate-400">
-                                    {formatHistoryResponse(item.response)}
-                                  </pre>
-                                </div>
-                              </div>
-                            </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -738,7 +1056,7 @@ export default function Home() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-dashed border-white/10 bg-[#0d0d18] px-5 py-8 text-sm text-slate-500">
-                  No API requests have been recorded in this session yet.
+                  No API requests match the current filters.
                 </div>
               )}
             </div>

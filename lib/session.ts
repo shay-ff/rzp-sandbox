@@ -1,10 +1,12 @@
 import { getIronSession, IronSession, SessionOptions } from "iron-session";
 import { cookies } from "next/headers";
+import type { RequestHistoryEntry } from "./history";
 
 export interface SessionData {
   authenticated?: boolean;
   keyId?: string;
   keySecret?: string;
+  requestHistory?: RequestHistoryEntry[];
 }
 
 export const sessionOptions: SessionOptions = {
