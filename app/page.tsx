@@ -62,6 +62,8 @@ export default function Home() {
   const [responseViewMode, setResponseViewMode] = useState<Record<string, "json" | "raw">>({});
   const [checkoutValues, setCheckoutValues] = useState<Record<string, Record<string, string>>>({});
   const [requestHistory, setRequestHistory] = useState<RequestHistoryItem[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   
   useEffect(() => {
     fetch("/api/session")
@@ -144,6 +146,10 @@ export default function Home() {
 
   const clearRequestHistory = () => {
     setRequestHistory([]);
+  };
+
+  const toggleHistoryRow = (id: string) => {
+    setExpandedHistoryId((p) => (p === id ? null : id));
   };
 
   const createHistoryId = () => {
@@ -625,77 +631,120 @@ export default function Home() {
             </section>
           ))}
 
-          <section>
-            <div className="flex items-center gap-3 mb-6">
-              <h2 className="text-xs tracking-widest text-slate-500 uppercase">Session History</h2>
-              <span className="text-[10px] bg-slate-500/10 border border-slate-500/20 text-slate-400 px-2 py-0.5 rounded-full">
-                {requestHistory.length} requests
-              </span>
+        </div>
+      </main>
+
+      <div className="fixed top-4 right-4 z-50">
+        <button
+          onClick={() => setHistoryOpen((p) => !p)}
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#0d0d18]/90 px-4 py-2 text-xs font-semibold text-slate-200 shadow-lg shadow-black/30 backdrop-blur hover:border-indigo-400/40 hover:text-white transition-colors"
+        >
+          <span>History</span>
+          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">{requestHistory.length}</span>
+        </button>
+
+        {historyOpen && (
+          <div className="mt-3 w-[min(92vw,56rem)] rounded-2xl border border-white/10 bg-[#0b0b11]/95 shadow-2xl shadow-black/50 backdrop-blur overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
+              <div>
+                <h2 className="text-xs tracking-widest text-slate-400 uppercase">Session History</h2>
+                <p className="text-[10px] text-slate-600">Requests stay in this browser session</p>
+              </div>
               <button
                 onClick={clearRequestHistory}
                 disabled={!requestHistory.length}
-                className="ml-auto text-[10px] text-slate-500 hover:text-slate-300 transition-colors disabled:opacity-40"
+                className="ml-auto text-[10px] text-slate-500 hover:text-slate-200 transition-colors disabled:opacity-40"
               >
-                clear history
+                clear
               </button>
-              <div className="flex-1 h-px bg-white/5" />
+              <button
+                onClick={() => setHistoryOpen(false)}
+                className="text-[10px] text-slate-500 hover:text-slate-200 transition-colors"
+              >
+                close
+              </button>
             </div>
 
-            {requestHistory.length ? (
-              <div className="space-y-3 max-h-[32rem] overflow-y-auto pr-1">
-                {requestHistory.slice().reverse().map((item) => (
-                  <div key={item.id} className="border border-white/5 rounded-lg bg-[#0d0d18] overflow-hidden">
-                    <div className="px-5 py-3 border-b border-white/5 flex flex-wrap items-center gap-3">
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${METHOD_COLOR[item.method] || "text-slate-300 bg-white/5 border-white/10"}`}>
-                        {item.method}
-                      </span>
-                      <span className="text-xs text-slate-300 font-semibold">{item.endpointLabel}</span>
-                      {item.variantKey && (
-                        <span className="text-[10px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">
-                          {item.variantKey}
-                        </span>
-                      )}
-                      <span className={`text-[10px] font-bold ${STATUS_COLOR(item.status)}`}>
-                        {item.status ?? "failed"}
-                      </span>
-                      <span className="ml-auto text-[10px] text-slate-600">
-                        {new Date(item.timestamp).toLocaleString()}
-                      </span>
-                    </div>
+            <div className="max-h-[70vh] overflow-y-auto p-3">
+              {requestHistory.length ? (
+                <div className="space-y-2">
+                  {requestHistory.slice().reverse().map((item) => {
+                    const isExpanded = expandedHistoryId === item.id;
+                    return (
+                      <div key={item.id} className="rounded-xl border border-white/5 bg-[#0d0d18] overflow-hidden">
+                        <button
+                          onClick={() => toggleHistoryRow(item.id)}
+                          className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                        >
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded border shrink-0 ${METHOD_COLOR[item.method] || "text-slate-300 bg-white/5 border-white/10"}`}>
+                            {item.method}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-xs text-slate-200 font-semibold">
+                            {item.endpointLabel}
+                          </span>
+                          {item.variantKey && (
+                            <span className="shrink-0 rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[10px] text-cyan-300">
+                              {item.variantKey}
+                            </span>
+                          )}
+                          <span className={`shrink-0 text-[10px] font-bold ${STATUS_COLOR(item.status)}`}>
+                            {item.status ?? "failed"}
+                          </span>
+                          <span className="shrink-0 text-[10px] text-slate-500">{isExpanded ? "−" : "+"}</span>
+                        </button>
 
-                    <div className="p-5 space-y-4">
-                      <div>
-                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1.5">URL</label>
-                        <p className="text-xs text-slate-300 break-all font-mono">{item.url || "-"}</p>
+                        {isExpanded && (
+                          <div className="grid gap-px border-t border-white/5 bg-white/5 md:grid-cols-2">
+                            <div className="bg-[#0b0b11] p-4">
+                              <div className="mb-3 flex items-center gap-2">
+                                <span className="text-[10px] tracking-widest text-slate-500 uppercase">Request</span>
+                              </div>
+                              <div className="space-y-3 text-xs text-slate-300">
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">URL</p>
+                                  <p className="break-all font-mono text-[11px] text-slate-300">{item.url || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Body</p>
+                                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-black/40 p-3 text-[11px] leading-relaxed text-slate-400">
+                                    {item.requestBody || "No body"}
+                                  </pre>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="bg-[#0b0b11] p-4">
+                              <div className="mb-3 flex items-center gap-2">
+                                <span className="text-[10px] tracking-widest text-slate-500 uppercase">Response</span>
+                              </div>
+                              <div className="space-y-3 text-xs text-slate-300">
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Status</p>
+                                  <p className={`text-[11px] font-bold ${STATUS_COLOR(item.status)}`}>{item.status ?? "failed"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] uppercase tracking-widest text-slate-600 mb-1">Payload</p>
+                                  <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-black/40 p-3 text-[11px] leading-relaxed text-slate-400">
+                                    {formatHistoryResponse(item.response)}
+                                  </pre>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-
-                      {item.requestBody && (
-                        <div>
-                          <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1.5">Request Body</label>
-                          <pre className="bg-black/40 border border-white/5 rounded p-4 text-[11px] text-slate-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                            {item.requestBody}
-                          </pre>
-                        </div>
-                      )}
-
-                      <div>
-                        <label className="text-[10px] text-slate-600 tracking-widest uppercase block mb-1.5">Response</label>
-                        <pre className="bg-black/40 border border-white/5 rounded p-4 text-[11px] text-slate-400 overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                          {formatHistoryResponse(item.response)}
-                        </pre>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="border border-dashed border-white/10 rounded-lg bg-[#0d0d18] px-5 py-8 text-sm text-slate-500">
-                No API requests have been recorded in this session yet.
-              </div>
-            )}
-          </section>
-        </div>
-      </main>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-white/10 bg-[#0d0d18] px-5 py-8 text-sm text-slate-500">
+                  No API requests have been recorded in this session yet.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
