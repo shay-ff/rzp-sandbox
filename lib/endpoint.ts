@@ -697,7 +697,7 @@ export const endpointGroups: EndpointGroup[] = [
                 id: "Fetch Transfers by Order",
                 label: "Fetch Transfers by Order",
                 method: "GET",
-                url: "https://api.razorpay.com/v1/orders/order_DSkl2lBNvueOly/?expand[]=transfers&status=processing",
+                url: "https://api.razorpay.com/v1/orders/:order_id/?expand[]=transfers&status=processing",
                 params: ["order_id"],
             },
             {

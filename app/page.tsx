@@ -89,7 +89,8 @@ export default function Home() {
   const [historyGrouping, setHistoryGrouping] = useState<HistoryGrouping>("group");
   const [historyMethodFilter, setHistoryMethodFilter] = useState<EndpointMethodFilter>("ALL");
   const [collapsedHistoryGroups, setCollapsedHistoryGroups] = useState<Record<string, boolean>>({});
-  
+  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null);
+
   useEffect(() => {
     fetch("/api/session")
       .then((r) => r.json())
@@ -125,6 +126,21 @@ export default function Home() {
     setUrlValues(urls);
     setCheckoutValues(checkoutValues);
   }, [endpointGroups]);
+
+  useEffect(() => {
+    if (!pendingScrollId) return;
+    if (endpointMethodFilter !== "ALL" || endpointSearch.trim()) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(pendingScrollId);
+      if (!target) return;
+
+      target.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+      setPendingScrollId(null);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [pendingScrollId, endpointMethodFilter, endpointSearch]);
 
   const getEndpointDefaultBodyText = (endpoint: Endpoint) => {
     if (!endpoint.defaultBody) return "";
@@ -219,7 +235,7 @@ export default function Home() {
 
   const saveCredentials = async () => {
     if (!keyId || !keySecret) return;
-    if(!keyId.startsWith("rzp_test_") && !keyId.startsWith("rzp_live_")) {
+    if (!keyId.startsWith("rzp_test_") && !keyId.startsWith("rzp_live_")) {
       setCredError("Key ID should start with 'rzp_test_' or 'rzp_live_'");
       return;
     }
@@ -575,6 +591,12 @@ export default function Home() {
                     <a
                       key={ep.id}
                       href={`#${ep.id}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setEndpointMethodFilter("ALL");
+                        setEndpointSearch("");
+                        setPendingScrollId(ep.id);
+                      }}
                       className="flex items-center gap-2 py-1 text-[11px] text-slate-500 hover:text-slate-300 transition-colors"
                     >
                       {g.numbered && (
@@ -644,7 +666,7 @@ export default function Home() {
                   <div
                     key={ep.id}
                     id={ep.id}
-                    className="border border-white/5 rounded-lg bg-[#0d0d18] overflow-hidden"
+                    className="scroll-mt-24 border border-white/5 rounded-lg bg-[#0d0d18] overflow-hidden"
                   >
                     {/* Card Header */}
                     <div className="px-5 py-3 border-b border-white/5 flex items-center gap-3">
@@ -669,6 +691,9 @@ export default function Home() {
                               <div key={field}>
                                 <label className="text-[10px] text-slate-600 block mb-1">
                                   {field}
+                                  {["order_id", "customer_id"].includes(field) && (
+                                    <span className="text-red-400"> *</span>
+                                  )}
                                   {field === "key" && <span className="text-cyan-300"> · prefilled</span>}
                                 </label>
                                 <input
@@ -811,21 +836,19 @@ export default function Home() {
                                   <>
                                     <button
                                       onClick={() => setResponseViewMode((p) => ({ ...p, [ep.id]: "raw" }))}
-                                      className={`text-[10px] transition-colors ${
-                                        (responseViewMode[ep.id] || "raw") === "raw"
-                                          ? "text-cyan-300"
-                                          : "text-slate-600 hover:text-slate-400"
-                                      }`}
+                                      className={`text-[10px] transition-colors ${(responseViewMode[ep.id] || "raw") === "raw"
+                                        ? "text-cyan-300"
+                                        : "text-slate-600 hover:text-slate-400"
+                                        }`}
                                     >
                                       raw
                                     </button>
                                     <button
                                       onClick={() => setResponseViewMode((p) => ({ ...p, [ep.id]: "json" }))}
-                                      className={`text-[10px] transition-colors ${
-                                        (responseViewMode[ep.id] || "raw") === "json"
-                                          ? "text-cyan-300"
-                                          : "text-slate-600 hover:text-slate-400"
-                                      }`}
+                                      className={`text-[10px] transition-colors ${(responseViewMode[ep.id] || "raw") === "json"
+                                        ? "text-cyan-300"
+                                        : "text-slate-600 hover:text-slate-400"
+                                        }`}
                                     >
                                       json wrapper
                                     </button>
