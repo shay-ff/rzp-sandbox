@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { endpointGroups, Endpoint } from "@/lib/endpoint";
 import type { RequestHistoryEntry } from "@/lib/history";
-import { Analytics } from '@vercel/analytics/next';
 
 const ENDPOINT_METHOD_FILTERS = ["ALL", "GET", "POST", "PUT", "PATCH", "DELETE", "CHECKOUT"] as const;
 const HISTORY_GROUPING_OPTIONS = ["group", "method"] as const;
@@ -514,14 +514,23 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-slate-200 font-mono flex">
+    <div className="min-h-screen bg-[#0a0a0f] text-slate-200 font-mono flex flex-col lg:flex-row">
 
       {/* Sidebar */}
-      <aside className="w-56 border-r border-white/5 bg-[#0d0d18] flex flex-col shrink-0 sticky top-0 h-screen overflow-y-auto">
+      <aside className="w-full border-b border-white/5 bg-[#0d0d18] flex flex-col shrink-0 lg:w-56 lg:border-b-0 lg:border-r lg:sticky lg:top-0 lg:h-screen overflow-y-auto">
         {/* Logo */}
         <div className="px-5 py-4 border-b border-white/5">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-xs font-bold">⚡</div>
+            <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded bg-white/5 ring-1 ring-white/10">
+              <Image
+                src="/favicon.ico"
+                alt="Razorpay"
+                fill
+                sizes="24px"
+                className="object-contain p-0.5"
+                priority
+              />
+            </div>
             <span className="text-sm font-semibold text-indigo-300 tracking-wide">RZP Sandbox</span>
           </div>
         </div>
@@ -613,13 +622,13 @@ export default function Home() {
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-8 py-10 space-y-16">
-          <div className="sticky top-0 z-10 -mx-2 mb-4 rounded-2xl border border-white/5 bg-[#0a0a0f]/90 px-4 py-4 backdrop-blur">
+      <main className="flex-1 overflow-visible lg:overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 space-y-12 sm:space-y-16">
+          <div className="sticky top-0 z-10 -mx-2 mb-4 rounded-xl sm:rounded-2xl border border-white/5 bg-[#0a0a0f]/90 px-3 sm:px-4 py-3 sm:py-4 backdrop-blur">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-              <div className="flex-1">
-                <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1">Search endpoints</label>
-              </div>
+              {/* <div className="flex-1">
+                <label className="text-[10px] text-slate-500 tracking-widest uppercase block mb-1">Search by</label>
+              </div> */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[10px] text-slate-500 tracking-widest uppercase mr-1">Method</span>
                 {ENDPOINT_METHOD_FILTERS.map((method) => (
@@ -650,7 +659,7 @@ export default function Home() {
           {filteredEndpointGroups.map((g) => (
             <section key={g.group}>
               {/* Group Header */}
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
                 <h2 className="text-xs tracking-widest text-slate-500 uppercase">{g.group}</h2>
                 {g.numbered && (
                   <span className="text-[10px] bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full">
@@ -669,7 +678,7 @@ export default function Home() {
                     className="scroll-mt-24 border border-white/5 rounded-lg bg-[#0d0d18] overflow-hidden"
                   >
                     {/* Card Header */}
-                    <div className="px-5 py-3 border-b border-white/5 flex items-center gap-3">
+                    <div className="px-4 sm:px-5 py-3 border-b border-white/5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
                       {g.numbered && (
                         <span className="text-[10px] w-5 h-5 rounded-full border border-white/10 flex items-center justify-center text-slate-500 shrink-0">
                           {idx + 1}
@@ -686,7 +695,7 @@ export default function Home() {
                       {ep.method === "CHECKOUT" ? (
                         <div className="space-y-3">
                           <p className="text-[11px] text-slate-500">Fill fields then open Razorpay checkout</p>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {(ep.checkoutFields ?? []).map((field) => (
                               <div key={field}>
                                 <label className="text-[10px] text-slate-600 block mb-1">
@@ -713,7 +722,7 @@ export default function Home() {
                           </div>
                           <button
                             onClick={() => openCheckout(ep)}
-                            className="px-4 py-2 bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold rounded hover:bg-cyan-500/30 transition-all"
+                            className="w-full sm:w-auto px-4 py-2 bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold rounded hover:bg-cyan-500/30 transition-all"
                           >
                             Open Checkout →
                           </button>
@@ -789,18 +798,18 @@ export default function Home() {
                           )}
 
                           {/* Actions */}
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
                             <button
                               onClick={() => sendRequest(ep)}
                               disabled={loading[ep.id] || !credsSaved}
                               title={!credsSaved ? "Save credentials first" : ""}
-                              className={`px-5 py-2 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded hover:bg-indigo-500/30 transition-all disabled:opacity-50 ${loading[ep.id] ? "cursor-wait" : !credsSaved ? "cursor-not-allowed" : ""}`}
+                              className={`w-full sm:w-auto px-5 py-2 bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold rounded hover:bg-indigo-500/30 transition-all disabled:opacity-50 ${loading[ep.id] ? "cursor-wait" : !credsSaved ? "cursor-not-allowed" : ""}`}
                             >
                               {loading[ep.id] ? "sending..." : "Send →"}
                             </button>
                             <button
                               onClick={() => copyCurl(ep)}
-                              className="px-3 py-2 bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold rounded hover:bg-white/10 transition-all"
+                              className="w-full sm:w-auto px-3 py-2 bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold rounded hover:bg-white/10 transition-all"
                             >
                               Copy cURL
                             </button>
@@ -808,13 +817,13 @@ export default function Home() {
                               <>
                                 <button
                                   onClick={() => navigator.clipboard.writeText(getResponseRawCopyText(responses[ep.id]))}
-                                  className="px-3 py-2 bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold rounded hover:bg-white/10 transition-all"
+                                  className="w-full sm:w-auto px-3 py-2 bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold rounded hover:bg-white/10 transition-all"
                                 >
                                   Copy JSON
                                 </button>
                                 <button
                                   onClick={() => navigator.clipboard.writeText(getResponseSummaryText(responses[ep.id]))}
-                                  className="px-3 py-2 bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold rounded hover:bg-white/10 transition-all"
+                                  className="w-full sm:w-auto px-3 py-2 bg-white/5 border border-white/10 text-slate-300 text-xs font-semibold rounded hover:bg-white/10 transition-all"
                                 >
                                   Copy summary
                                 </button>
@@ -830,7 +839,7 @@ export default function Home() {
                           {/* Response */}
                           {responses[ep.id] && (
                             <div className="mt-2">
-                              <div className="flex items-center gap-3 mb-2">
+                              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                                 <label className="text-[10px] text-slate-600 tracking-widest uppercase">Response</label>
                                 {responses[ep.id].isJson === false && (
                                   <>
@@ -891,18 +900,18 @@ export default function Home() {
         </div>
       </main>
 
-      <div className="fixed top-4 right-4 z-50">
+      <div className="fixed inset-x-3 bottom-3 z-50 sm:inset-x-auto sm:bottom-auto sm:top-4 sm:right-4">
         <button
           onClick={() => setHistoryOpen((p) => !p)}
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-[#0d0d18]/90 px-4 py-2 text-xs font-semibold text-slate-200 shadow-lg shadow-black/30 backdrop-blur hover:border-indigo-400/40 hover:text-white transition-colors"
+          className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-full border border-white/10 bg-[#0d0d18]/90 px-4 py-2 text-xs font-semibold text-slate-200 shadow-lg shadow-black/30 backdrop-blur hover:border-indigo-400/40 hover:text-white transition-colors"
         >
           <span>History</span>
           <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">{requestHistory.length}</span>
         </button>
 
         {historyOpen && (
-          <div className="mt-3 w-[min(92vw,56rem)] rounded-2xl border border-white/10 bg-[#0b0b11]/95 shadow-2xl shadow-black/50 backdrop-blur overflow-hidden">
-            <div className="flex items-center gap-3 border-b border-white/5 px-4 py-3">
+          <div className="mt-3 w-full sm:w-[min(92vw,56rem)] max-h-[85vh] overflow-hidden rounded-2xl border border-white/10 bg-[#0b0b11]/95 shadow-2xl shadow-black/50 backdrop-blur">
+            <div className="flex flex-col items-start gap-3 border-b border-white/5 px-4 py-3 sm:flex-row sm:items-center">
               <div>
                 <h2 className="text-xs tracking-widest text-slate-400 uppercase">Session History</h2>
                 <p className="text-[10px] text-slate-600">Requests are stored with the saved session</p>
@@ -910,7 +919,7 @@ export default function Home() {
               <button
                 onClick={clearRequestHistory}
                 disabled={!requestHistory.length}
-                className="ml-auto text-[10px] text-slate-500 hover:text-slate-200 transition-colors disabled:opacity-40"
+                className="text-[10px] text-slate-500 hover:text-slate-200 transition-colors disabled:opacity-40 sm:ml-auto"
               >
                 clear
               </button>

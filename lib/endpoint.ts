@@ -37,6 +37,30 @@ export const endpointGroups: EndpointGroup[] = [
                 url: "https://api.razorpay.com/v1/orders/:order_id",
                 params: ["order_id"],
             },
+            {
+                id: "fetch_all_orders",
+                label: "Fetch All Orders",
+                method: "GET",
+                url: "https://api.razorpay.com/v1/orders?count=2&skip=1",
+            }
+        ],
+    },
+    {
+        group: "Settlement API",
+        endpoints: [
+            {
+                id: "fetch_settlement",
+                label: "Fetch Settlement",
+                method: "GET",
+                url: "https://api.razorpay.com/v1/settlements/:settlement_id",
+                params: ["settlement_id"],
+            },
+            {
+                id: "fetch_all_settlements",
+                label: "Fetch All Settlements",
+                method: "GET",
+                url: "https://api.razorpay.com/v1/settlements",
+            }
         ],
     },
     {
@@ -50,6 +74,50 @@ export const endpointGroups: EndpointGroup[] = [
                 params: ["payment_id"],
             },
         ],
+    },
+    {
+        group: "Refund API",
+        endpoints: [
+            {
+                id: "create_refund",
+                label: "Create Refund",
+                method: "POST",
+                url: "https://api.razorpay.com/v1/:payment_id/refunds",
+                params: ["payment_id"],
+                variants: [
+                    { label: "Normal Refund", key: "normal" },
+                    { label: "Instant Refund", key: "instant" },
+                ],
+                defaultBody: {
+                    normal: {
+                        amount: 5000
+                    },
+                    instant: {
+                        amount: 500100,
+                        speed: "optimum",
+                        receipt: "Receipt No. 31",
+                        notes: {
+                            notes_key_1: "Tea, Earl Grey, Hot",
+                            notes_key_2: "Tea, Earl Grey… decaf."
+                        }
+
+                    }
+                },
+            },
+            {
+                id: "fetch_refund",
+                label: "Fetch Refund",
+                method: "GET",
+                url: "https://api.razorpay.com/v1/refunds/:refund_id",
+                params: ["refund_id"],
+            },
+            {
+                id: "fetch_all_refunds",
+                label: "Fetch All Refunds",
+                method: "GET",
+                url: "https://api.razorpay.com/v1/refunds",
+            }
+        ]
     },
     {
         group: "Subscription API",
@@ -73,6 +141,12 @@ export const endpointGroups: EndpointGroup[] = [
                 params: ["plan_id"],
             },
             {
+                id: "fetch_all_plans",
+                label: "Fetch All Plans",
+                method: "GET",
+                url: "https://api.razorpay.com/v1/plans",
+            },
+            {
                 id: "create_subscription",
                 label: "Create Subscription",
                 method: "POST",
@@ -82,6 +156,19 @@ export const endpointGroups: EndpointGroup[] = [
                     total_count: 6,
                     quantity: 1,
                 },
+            },
+            {
+                id: "fetch_subscription",
+                label: "Fetch Subscription",
+                method: "GET",
+                url: "https://api.razorpay.com/v1/subscriptions/:subscription_id",
+                params: ["subscription_id"],
+            },
+            {
+                id: "fetch_all_subscriptions",
+                label: "Fetch All Subscriptions",
+                method: "GET",
+                url: "https://api.razorpay.com/v1/subscriptions",
             },
             {
                 id: "cancel_subscription",
@@ -422,6 +509,37 @@ export const endpointGroups: EndpointGroup[] = [
                 method: "CHECKOUT",        // special type, not an API call
                 url: null,
                 checkoutFields: ["key", "order_id", "customer_id", "name", "email", "contact"],
+            },
+            {
+                id: "create_registration_link",
+                label: "Create Registration Link",
+                method: "POST",
+                url: "https://api.razorpay.com/v1/subscription_registration/auth_links",
+                defaultBody: {
+                    customer: {
+                        name: "Gaurav Kumar",
+                        email: "gaurav.kumar@example.com",
+                        contact: "+919876543210"
+                    },
+                    type: "link",
+                    amount: "100",
+                    currency: "INR",
+                    description: "Registration Link for Gaurav Kumar",
+                    subscription_registration: {
+                        method: "card",
+                        max_amount: "1000000",
+                        expire_at: 1609423824,
+                        frequency: "monthly"
+                    },
+                    receipt: "Receipt No. 1",
+                    email_notify: true,
+                    sms_notify: true,
+                    expire_by: 1580479824,
+                    notes: {
+                        note_key_1: "Beam me up Scotty",
+                        note_key_2: "Tea. Earl Gray. Hot."
+                    }
+                },
             },
             {
                 id: "caw_fetch_payment",

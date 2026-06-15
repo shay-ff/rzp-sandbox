@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
@@ -24,6 +24,12 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -34,7 +40,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
         <Analytics />
-        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="beforeInteractive" />  {/* ← move inside body */}
+        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="beforeInteractive" />
       </body>
     </html>
   );
