@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-bg: var(--primary-bg);
+  --color-text-high: var(--text-high);
+  --color-text-medium: var(--text-medium);
+  --color-text-low: var(--text-low);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-error: var(--error);
+  --color-error-bg: var(--error-bg);
+  --color-amber: var(--amber);
+  --color-amber-bg: var(--amber-bg);
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, monospace;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --bg: #ffffff;
+  --surface: #f7f8fa;
+  --surface-hover: #ebedf0;
+  --primary: #528ff0;
+  --primary-hover: #3a7de0;
+  --primary-bg: rgba(82, 143, 240, 0.1);
+  --text-high: #1a1a1a;
+  --text-medium: #4b5468;
+  --text-low: #8b95a5;
+  --border: #d3d9e4;
+  --success: #00a86b;
+  --success-bg: rgba(0, 168, 107, 0.1);
+  --error: #cc3333;
+  --error-bg: rgba(204, 51, 51, 0.1);
+  --amber: #d4a017;
+  --amber-bg: rgba(212, 160, 23, 0.1);
+}
+
+.dark {
+  --bg: #0d0d0d;
+  --surface: #1a1a1a;
+  --surface-hover: #252525;
+  --primary: #528ff0;
+  --primary-hover: #6ba3ff;
+  --primary-bg: rgba(82, 143, 240, 0.15);
+  --text-high: #f7f8fa;
+  --text-medium: #a5afbf;
+  --text-low: #5e6a7e;
+  --border: #2e2e2e;
+  --success: #00c27c;
+  --success-bg: rgba(0, 194, 124, 0.15);
+  --error: #ff6666;
+  --error-bg: rgba(255, 102, 102, 0.15);
+  --amber: #e5b840;
+  --amber-bg: rgba(229, 184, 64, 0.15);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text-medium);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
