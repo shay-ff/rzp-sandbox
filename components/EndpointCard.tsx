@@ -9,6 +9,7 @@ import {
   getResponseSummaryText,
   getResponsePreviewText,
   getResponseRawCopyText,
+  resolveUrl,
 } from "@/lib/utils/helpers";
 import { MethodBadge } from "./MethodBadge";
 
@@ -27,6 +28,8 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
     setUrlValues,
     checkoutValues,
     setCheckoutValues,
+    urlParamValues,
+    setUrlParamValues,
     selectedVariants,
     setSelectedVariants,
     bodyErrors,
@@ -106,12 +109,66 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
           <>
             <div>
               <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">URL</label>
-              <input
-                value={urlValues[ep.id] || ep.url || ""}
-                onChange={(e) => setUrlValues((p) => ({ ...p, [ep.id]: e.target.value }))}
-                className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high outline-none focus:border-primary transition-colors font-mono"
-              />
+              <div className="flex items-stretch gap-2">
+                <input
+                  value={ep.params && ep.params.length > 0
+                    ? resolveUrl(urlValues[ep.id] || ep.url || "", urlParamValues[ep.id] || {})
+                    : (urlValues[ep.id] || ep.url || "")
+                  }
+                  readOnly={ep.params && ep.params.length > 0}
+                  onChange={ep.params && ep.params.length > 0
+                    ? undefined
+                    : (e) => setUrlValues((p) => ({ ...p, [ep.id]: e.target.value }))
+                  }
+                  className="flex-1 bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high outline-none focus:border-primary transition-colors font-mono"
+                />
+                <button
+                  onClick={() => copyToClipboard(
+                    resolveUrl(urlValues[ep.id] || ep.url || "", urlParamValues[ep.id] || {}),
+                    `url-${ep.id}`
+                  )}
+                  className="relative px-3 py-2 bg-surface border border-border text-text-high text-xs font-semibold rounded-md hover:bg-surface-hover transition-all shrink-0"
+                >
+                  Copy URL
+                  {getCopyStatus(`url-${ep.id}`) && (
+                    <span className={`absolute -right-1 -top-2 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                      getCopyStatus(`url-${ep.id}`) === "copied"
+                        ? "bg-success text-white"
+                        : "bg-error text-white"
+                    }`}>
+                      {getCopyStatus(`url-${ep.id}`)}
+                    </span>
+                  )}
+                </button>
+              </div>
+              {ep.params && ep.params.length > 0 && (
+                <p className="text-[10px] text-text-low mt-1">Template: {urlValues[ep.id] || ep.url || ""}</p>
+              )}
             </div>
+
+            {ep.params && ep.params.length > 0 && (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {ep.params.map((param) => (
+                  <div key={param}>
+                    <label className="text-[10px] text-text-medium block mb-1">
+                      {param}
+                      <span className="text-error"> *</span>
+                    </label>
+                    <input
+                      placeholder={param}
+                      value={urlParamValues[ep.id]?.[param] || ""}
+                      onChange={(e) =>
+                        setUrlParamValues((p) => ({
+                          ...p,
+                          [ep.id]: { ...p[ep.id], [param]: e.target.value },
+                        }))
+                      }
+                      className="w-full bg-bg border border-border rounded-md px-3 py-1.5 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors font-mono"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
 
             {ep.variants && (
               <div>

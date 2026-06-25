@@ -10,6 +10,7 @@ import {
   getResponseSummaryText,
   getResponsePreviewText,
   shellEscape,
+  resolveUrl,
 } from "@/lib/utils/helpers";
 import { endpointMetaById } from "@/lib/utils/endpointMeta";
 
@@ -18,6 +19,7 @@ export function useRequestHandler(
   keySecret: string,
   bodyValues: Record<string, string>,
   urlValues: Record<string, string>,
+  urlParamValues: Record<string, Record<string, string>>,
   selectedVariants: Record<string, string>,
   saveRequestHistory: (entry: RequestHistoryEntry) => Promise<void>
 ) {
@@ -67,7 +69,9 @@ export function useRequestHandler(
         if (requestBodyText) {
           body = JSON.parse(requestBodyText);
         }
-        const url = urlValues[ep.id] || ep.url || "";
+        const templateUrl = urlValues[ep.id] || ep.url || "";
+        const params = urlParamValues[ep.id] || {};
+        const url = resolveUrl(templateUrl, params);
         const res = await fetch("/api/rzp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -101,13 +105,14 @@ export function useRequestHandler(
       } catch (error) {
         const message = error instanceof Error ? error.message : "Request failed";
         setResponses((p) => ({ ...p, [ep.id]: { error: message } }));
+        const errorUrl = resolveUrl(urlValues[ep.id] || ep.url || "", urlParamValues[ep.id] || {});
         await saveRequestHistory({
           id: createHistoryId(),
           endpointId: ep.id,
           endpointLabel: ep.label,
           endpointGroup: endpointMetaById[ep.id]?.group,
           method: ep.method,
-          url: urlValues[ep.id] || ep.url || "",
+          url: errorUrl,
           requestBody: requestBodyText.trim() || null,
           responseSummary: `Error: ${message}`,
           responsePreview: message,
@@ -120,12 +125,14 @@ export function useRequestHandler(
         setLoading((p) => ({ ...p, [ep.id]: false }));
       }
     },
-    [bodyValues, urlValues, selectedVariants, saveRequestHistory, clearCopyStatus]
+    [bodyValues, urlValues, urlParamValues, selectedVariants, saveRequestHistory, clearCopyStatus]
   );
 
   const buildCurlCommand = useCallback(
     (ep: Endpoint) => {
-      const url = (urlValues[ep.id] || ep.url || "").trim();
+      const templateUrl = urlValues[ep.id] || ep.url || "";
+      const params = urlParamValues[ep.id] || {};
+      const url = resolveUrl(templateUrl, params).trim();
       if (!url) throw new Error("URL is required");
 
       const parts = ["curl", "-X", ep.method, shellEscape(url)];
@@ -140,7 +147,7 @@ export function useRequestHandler(
       }
       return parts.join(" ");
     },
-    [keyId, keySecret, bodyValues]
+    [keyId, keySecret, bodyValues, urlValues, urlParamValues]
   );
 
   const copyCurl = useCallback(

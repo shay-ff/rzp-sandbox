@@ -7,6 +7,7 @@ function buildEndpointState() {
   const bodies: Record<string, string> = {};
   const urls: Record<string, string> = {};
   const checkoutValues: Record<string, Record<string, string>> = {};
+  const urlParamValues: Record<string, Record<string, string>> = {};
 
   endpointGroups.forEach((group) => {
     group.endpoints.forEach((endpoint) => {
@@ -29,24 +30,32 @@ function buildEndpointState() {
           return acc;
         }, {});
       }
+      if (endpoint.params) {
+        urlParamValues[endpoint.id] = endpoint.params.reduce<Record<string, string>>((acc, param) => {
+          acc[param] = "";
+          return acc;
+        }, {});
+      }
     });
   });
 
-  return { bodies, urls, checkoutValues };
+  return { bodies, urls, checkoutValues, urlParamValues };
 }
 
 export function useEndpointState() {
   const [bodyValues, setBodyValues] = useState<Record<string, string>>({});
   const [urlValues, setUrlValues] = useState<Record<string, string>>({});
   const [checkoutValues, setCheckoutValues] = useState<Record<string, Record<string, string>>>({});
+  const [urlParamValues, setUrlParamValues] = useState<Record<string, Record<string, string>>>({});
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [bodyErrors, setBodyErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const { bodies, urls, checkoutValues } = buildEndpointState();
+    const { bodies, urls, checkoutValues, urlParamValues } = buildEndpointState();
     setBodyValues(bodies);
     setUrlValues(urls);
     setCheckoutValues(checkoutValues);
+    setUrlParamValues(urlParamValues);
   }, []);
 
   return {
@@ -56,6 +65,8 @@ export function useEndpointState() {
     setUrlValues,
     checkoutValues,
     setCheckoutValues,
+    urlParamValues,
+    setUrlParamValues,
     selectedVariants,
     setSelectedVariants,
     bodyErrors,

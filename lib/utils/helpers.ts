@@ -95,6 +95,15 @@ export const getResponseCopyText = (response: any) => {
   return JSON.stringify(response?.data || response, null, 2);
 };
 
+export const resolveUrl = (url: string | null, params: Record<string, string>) => {
+  if (!url) return "";
+  let resolved = url;
+  Object.entries(params).forEach(([key, value]) => {
+    resolved = resolved.replace(new RegExp(`:${key}\\b`, "g"), value);
+  });
+  return resolved;
+};
+
 export const getCheckoutFieldHint = (field: string) => {
   switch (field) {
     case "key":
@@ -112,6 +121,13 @@ export const getCheckoutFieldHint = (field: string) => {
     default:
       return "Required for checkout";
   }
+};
+
+export const getUrlParamNames = (url: string | null): string[] => {
+  if (!url) return [];
+  const matches = url.match(/:(\w+)/g);
+  if (!matches) return [];
+  return [...new Set(matches.map((m) => m.slice(1)))];
 };
 
 export const getEndpointDefaultBodyText = (endpoint: any, selectedVariants: Record<string, string>) => {

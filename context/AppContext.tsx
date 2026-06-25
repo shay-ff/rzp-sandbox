@@ -15,6 +15,7 @@ function useAppState() {
     credentials.keySecret,
     endpointState.bodyValues,
     endpointState.urlValues,
+    endpointState.urlParamValues,
     endpointState.selectedVariants,
     history.saveRequestHistory
   );
