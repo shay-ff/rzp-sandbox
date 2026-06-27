@@ -82,7 +82,7 @@ export const endpointGroups: EndpointGroup[] = [
                 id: "create_refund",
                 label: "Create Refund",
                 method: "POST",
-                url: "https://api.razorpay.com/v1/:payment_id/refunds",
+                url: "https://api.razorpay.com/v1/payments/:payment_id/refund",
                 params: ["payment_id"],
                 variants: [
                     { label: "Normal Refund", key: "normal" },
@@ -547,6 +547,13 @@ export const endpointGroups: EndpointGroup[] = [
                 method: "GET",
                 url: "https://api.razorpay.com/v1/payments/:payment_id",
                 params: ["payment_id"],
+            },
+            {
+                id: "caw_fetch_token_by_customer_id",
+                label: "Fetch Token by Customer Id",
+                method: "GET",
+                url: "https://api.razorpay.com/v1/customers/:customer_id/tokens",
+                params: ["customer_id"],
             },
             {
                 id: "caw_create_mandate_order",
