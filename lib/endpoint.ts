@@ -82,7 +82,7 @@ export const endpointGroups: EndpointGroup[] = [
                 id: "create_refund",
                 label: "Create Refund",
                 method: "POST",
-                url: "https://api.razorpay.com/v1/payments/:payment_id/refund",
+                url: "https://api.razorpay.com/v1/payments/:payment_id/refunds",
                 params: ["payment_id"],
                 variants: [
                     { label: "Normal Refund", key: "normal" },
@@ -187,7 +187,7 @@ export const endpointGroups: EndpointGroup[] = [
                 id: "create_payment_link",
                 label: "Create Payment Link",
                 method: "POST",
-                url: "https://api.razorpay.com/v1/payment_links/",
+                url: "https://api.razorpay.com/v1/payment_links",
                 variants: [
                     { label: "Standard Payment Link", key: "standard_payment_link" },
                     { label: "UPI Payment Link", key: "upi_payment_link" },
@@ -299,25 +299,11 @@ export const endpointGroups: EndpointGroup[] = [
                 url: "https://api.razorpay.com/v1/payments/qr_codes",
             },
             {
-                id: "fetch_qr_code_for_a_customer",
-                label: "Fetch QR Code For A Customer",
-                method: "GET",
-                url: "https://api.razorpay.com/v1/payments/customers/:customer_id/qr_codes",
-                params: ["customer_id"],
-            },
-            {
                 id: "fetch_qr_code_payment",
                 label: "Fetch QR Code Payment",
                 method: "GET",
                 url: "https://api.razorpay.com/v1/payments/qr_codes/:qr_code_id/payments",
                 params: ["qr_code_id"],
-            },
-            {
-                id: "fetch_qr_code_payment_by_id",
-                label: "Fetch QR Code Payment By ID",
-                method: "GET",
-                url: "https://api.razorpay.com/v1/payments/qr_codes/:qr_code_id/payments/:payment_id",
-                params: ["qr_code_id", "payment_id"],
             },
             {
                 id: "close_qr_code",
@@ -822,7 +808,7 @@ export const endpointGroups: EndpointGroup[] = [
                 id: "Fetch Transfers by Order",
                 label: "Fetch Transfers by Order",
                 method: "GET",
-                url: "https://api.razorpay.com/v1/orders/:order_id/?expand[]=transfers&status=processing",
+                url: "https://api.razorpay.com/v1/orders/:order_id?expand[]=transfers&status=processing",
                 params: ["order_id"],
             },
             {

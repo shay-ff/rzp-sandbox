@@ -1,0 +1,1266 @@
+diff --git a/app/checkout/page.tsx b/app/checkout/page.tsx
+new file mode 100644
+index 0000000..734e0f1
+--- /dev/null
++++ b/app/checkout/page.tsx
+@@ -0,0 +1,63 @@
++"use client";
++
++import Link from "next/link";
++import { CheckoutBuilder } from "@/components/CheckoutBuilder";
++import { HistoryPanel } from "@/components/HistoryPanel";
++import { Sidebar } from "@/components/Sidebar";
++
++export default function CheckoutPage() {
++  return (
++    <div className="min-h-screen bg-bg text-text-medium font-sans flex flex-col lg:flex-row">
++      <Sidebar />
++      <main className="flex-1 overflow-visible lg:overflow-y-auto">
++        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 space-y-8">
++          <div>
++            <h1 className="text-lg font-semibold text-text-high tracking-tight">
++              Standard Checkout Builder
++            </h1>
++            <p className="text-xs text-text-medium mt-1">
++              Configure Razorpay Standard Checkout with custom payment methods, ordering, and bank / network / wallet filtering.
++              No saved credentials needed—just enter your key and order_id directly below.
++            </p>
++          </div>
++
++          <div className="rounded-lg border border-border bg-surface p-4">
++            <div className="flex items-start gap-2">
++              <svg className="shrink-0 text-primary mt-0.5" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
++                <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.47l-.451-.081.082-.381 2.29-.287zM8 5.5a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/>
++              </svg>
++              <div className="space-y-1">
++                <p className="text-[11px] text-text-medium leading-relaxed">
++                  <strong className="text-text-high">How to use:</strong> Enter your key and order_id, enable/disable payment methods, drag to reorder them, and select specific card networks / banks / wallets. The generated code will reflect your configuration. Click "Test Live Checkout" to open the actual Razorpay checkout modal.
++                </p>
++                <p className="text-[10px] text-text-low">
++                  Reference: {" "}
++                  <Link
++                    href="https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/configure-payment-methods/"
++                    target="_blank"
++                    rel="noopener noreferrer"
++                    className="text-primary hover:underline"
++                  >
++                    Configure Payment Methods
++                  </Link>
++                  {" · "}
++                  <Link
++                    href="https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/configure-payment-methods/display-configuration/"
++                    target="_blank"
++                    rel="noopener noreferrer"
++                    className="text-primary hover:underline"
++                  >
++                    Display Configuration
++                  </Link>
++                </p>
++              </div>
++            </div>
++          </div>
++
++          <CheckoutBuilder />
++        </div>
++      </main>
++      <HistoryPanel />
++    </div>
++  );
++}
+diff --git a/components/CheckoutBuilder.tsx b/components/CheckoutBuilder.tsx
+new file mode 100644
+index 0000000..330afeb
+--- /dev/null
++++ b/components/CheckoutBuilder.tsx
+@@ -0,0 +1,683 @@
++"use client";
++
++import { useState, useCallback, useRef } from "react";
++import {
++  type PaymentMethodConfig,
++  type CheckoutOptions,
++  PAYMENT_METHODS,
++  BANK_ISSUERS,
++  CARD_NETWORKS,
++  WALLETS,
++  PAYLATER_PROVIDERS,
++  CURRENCY_PRESETS,
++  DEFAULT_CHECKOUT_OPTIONS,
++  generateCheckoutCode,
++  buildCheckoutOptions,
++} from "@/lib/checkoutConfig";
++import { CheckoutCodePreview } from "./CheckoutCodePreview";
++
++interface DragState {
++  draggedId: string | null;
++  draggedOverId: string | null;
++}
++
++export function CheckoutBuilder() {
++  const [options, setOptions] = useState<CheckoutOptions>(DEFAULT_CHECKOUT_OPTIONS);
++  const [methods, setMethods] = useState<PaymentMethodConfig[]>(PAYMENT_METHODS);
++  const [dragState, setDragState] = useState<DragState>({ draggedId: null, draggedOverId: null });
++  const [showTestModal, setShowTestModal] = useState(false);
++  const [testResult, setTestResult] = useState<string>("");
++  const [copied, setCopied] = useState(false);
++
++  const updateOption = useCallback(<K extends keyof CheckoutOptions>(
++    key: K,
++    value: CheckoutOptions[K]
++  ) => {
++    setOptions((prev) => ({ ...prev, [key]: value }));
++  }, []);
++
++  const updatePrefill = useCallback((field: string, value: string) => {
++    setOptions((prev) => ({
++      ...prev,
++      prefill: { ...prev.prefill, [field]: value },
++    }));
++  }, []);
++
++  const updateTheme = useCallback((color: string) => {
++    setOptions((prev) => ({
++      ...prev,
++      theme: { color },
++    }));
++  }, []);
++
++  const toggleMethod = useCallback((id: string) => {
++    setMethods((prev) =>
++      prev.map((m) => (m.id === id ? { ...m, enabled: !m.enabled } : m))
++    );
++  }, []);
++
++  const updateMethodConfig = useCallback((id: string, config: Record<string, any>) => {
++    setMethods((prev) =>
++      prev.map((m) => (m.id === id ? { ...m, config: { ...m.config, ...config } } : m))
++    );
++  }, []);
++
++  const handleDragStart = useCallback((id: string) => {
++    setDragState({ draggedId: id, draggedOverId: null });
++  }, []);
++
++  const handleDragOver = useCallback((e: React.DragEvent, id: string) => {
++    e.preventDefault();
++    setDragState((prev) => ({ ...prev, draggedOverId: id }));
++  }, []);
++
++  const handleDragEnd = useCallback(() => {
++    setDragState({ draggedId: null, draggedOverId: null });
++  }, []);
++
++  const handleDrop = useCallback((e: React.DragEvent, targetId: string) => {
++    e.preventDefault();
++    const draggedId = dragState.draggedId;
++    if (!draggedId || draggedId === targetId) {
++      setDragState({ draggedId: null, draggedOverId: null });
++      return;
++    }
++
++    setMethods((prev) => {
++      const draggedIndex = prev.findIndex((m) => m.id === draggedId);
++      const targetIndex = prev.findIndex((m) => m.id === targetId);
++      if (draggedIndex === -1 || targetIndex === -1) return prev;
++
++      const newMethods = [...prev];
++      const [removed] = newMethods.splice(draggedIndex, 1);
++      newMethods.splice(targetIndex, 0, removed);
++
++      return newMethods.map((m, i) => ({ ...m, order: i + 1 }));
++    });
++
++    setDragState({ draggedId: null, draggedOverId: null });
++  }, [dragState.draggedId]);
++
++  const toggleIssuer = useCallback((methodId: string, issuerCode: string, issuerList: string) => {
++    const current = methods.find((m) => m.id === methodId)?.config[issuerList] || [];
++    const exists = current.includes(issuerCode);
++    const updated = exists ? current.filter((c: string) => c !== issuerCode) : [...current, issuerCode];
++    updateMethodConfig(methodId, { [issuerList]: updated });
++  }, [methods, updateMethodConfig]);
++
++  const toggleWallet = useCallback((walletCode: string) => {
++    const current = methods.find((m) => m.id === "wallet")?.config.wallets || [];
++    const exists = current.includes(walletCode);
++    const updated = exists ? current.filter((c: string) => c !== walletCode) : [...current, walletCode];
++    updateMethodConfig("wallet", { wallets: updated });
++  }, [methods, updateMethodConfig]);
++
++  const togglePaylaterProvider = useCallback((provider: string) => {
++    const current = methods.find((m) => m.id === "paylater")?.config.providers || [];
++    const exists = current.includes(provider);
++    const updated = exists ? current.filter((c: string) => c !== provider) : [...current, provider];
++    updateMethodConfig("paylater", { providers: updated });
++  }, [methods, updateMethodConfig]);
++
++  const generatedOptions = buildCheckoutOptions(options, methods);
++  const code = generateCheckoutCode(generatedOptions);
++
++  const copyCode = async () => {
++    await navigator.clipboard.writeText(code);
++    setCopied(true);
++    setTimeout(() => setCopied(false), 2000);
++  };
++
++  const testCheckout = () => {
++    if (!options.key) {
++      setTestResult("Error: Key is required to test checkout.");
++      setShowTestModal(true);
++      return;
++    }
++    try {
++      const rzp = new (window as any).Razorpay({
++        ...generatedOptions,
++        modal: {
++          ...generatedOptions.modal,
++          // Razorpay expects a function here; the builder only stores a boolean toggle.
++          ondismiss: generatedOptions.modal?.ondismiss
++            ? function () {
++                console.log("Checkout form closed by user");
++              }
++            : undefined,
++        },
++        handler: function (response: any) {
++          // Razorpay auto-closes on success, but close explicitly so the
++          // overlay/iframe never lingers behind our own result modal.
++          rzp.close();
++          setTestResult(
++            `Payment Success!\nPayment ID: ${response.razorpay_payment_id}\nOrder ID: ${response.razorpay_order_id}\nSignature: ${response.razorpay_signature}`
++          );
++          setShowTestModal(true);
++        },
++      });
++      rzp.on("payment.failed", function (response: any) {
++        // Razorpay keeps its modal open after a failure (to allow retry) —
++        // close it first, otherwise its overlay stays stuck behind ours
++        // and the page becomes unscrollable once our modal is dismissed.
++        rzp.close();
++        setTestResult(
++          `Payment Failed!\nError: ${response.error.description}\nCode: ${response.error.code}`
++        );
++        setShowTestModal(true);
++      });
++      rzp.open();
++    } catch (err: any) {
++      setTestResult(`Error: ${err.message || "Failed to initialize checkout"}`);
++      setShowTestModal(true);
++    }
++  };
++
++  const enabledMethods = methods.filter((m) => m.enabled).sort((a, b) => a.order - b.order);
++
++  return (
++    <div className="space-y-8">
++      {/* Basic Fields */}
++      <section className="rounded-lg border border-border bg-surface p-5">
++        <h2 className="text-xs font-semibold text-text-high tracking-widest uppercase mb-4">
++          Checkout Configuration
++        </h2>
++        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Key ID
++            </label>
++            <input
++              value={options.key}
++              onChange={(e) => updateOption("key", e.target.value)}
++              placeholder="rzp_test_... or rzp_live_..."
++              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors font-mono"
++            />
++            <p className="text-[10px] text-text-low mt-1">No credentials required. Just paste your key.</p>
++          </div>
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Order ID
++            </label>
++            <input
++              value={options.order_id || ""}
++              onChange={(e) => updateOption("order_id", e.target.value)}
++              placeholder="order_... (optional)"
++              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors font-mono"
++            />
++            <p className="text-[10px] text-text-low mt-1">Optional. Checkout can run without an order_id (amount-only mode).</p>
++          </div>
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Amount (in paise)
++            </label>
++            <input
++              type="number"
++              value={options.amount}
++              onChange={(e) => updateOption("amount", Number(e.target.value))}
++              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors"
++            />
++          </div>
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Currency
++            </label>
++            <select
++              value={CURRENCY_PRESETS.includes(options.currency) ? options.currency : "custom"}
++              onChange={(e) => {
++                if (e.target.value === "custom") {
++                  updateOption("currency", "");
++                } else {
++                  updateOption("currency", e.target.value);
++                }
++              }}
++              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high outline-none focus:border-primary transition-colors"
++            >
++              {CURRENCY_PRESETS.map((code) => (
++                <option key={code} value={code}>
++                  {code}
++                </option>
++              ))}
++              <option value="custom">Custom...</option>
++            </select>
++            {!CURRENCY_PRESETS.includes(options.currency) && (
++              <input
++                value={options.currency}
++                onChange={(e) => updateOption("currency", e.target.value.toUpperCase())}
++                placeholder="e.g. SGD, AED, MYR"
++                maxLength={3}
++                className="mt-2 w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors font-mono uppercase"
++              />
++            )}
++          </div>
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Business Name
++            </label>
++            <input
++              value={options.name}
++              onChange={(e) => updateOption("name", e.target.value)}
++              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors"
++            />
++          </div>
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Description
++            </label>
++            <input
++              value={options.description}
++              onChange={(e) => updateOption("description", e.target.value)}
++              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors"
++            />
++          </div>
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Customer Name
++            </label>
++            <input
++              value={options.prefill.name}
++              onChange={(e) => updatePrefill("name", e.target.value)}
++              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors"
++            />
++          </div>
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Customer Email
++            </label>
++            <input
++              type="email"
++              value={options.prefill.email}
++              onChange={(e) => updatePrefill("email", e.target.value)}
++              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors"
++            />
++          </div>
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Customer Phone
++            </label>
++            <input
++              value={options.prefill.contact}
++              onChange={(e) => updatePrefill("contact", e.target.value)}
++              className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors"
++            />
++          </div>
++          <div>
++            <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
++              Theme Color
++            </label>
++            <div className="flex items-center gap-2">
++              <input
++                type="color"
++                value={options.theme.color}
++                onChange={(e) => updateTheme(e.target.value)}
++                className="h-8 w-8 rounded border border-border cursor-pointer bg-transparent"
++              />
++              <input
++                value={options.theme.color}
++                onChange={(e) => updateTheme(e.target.value)}
++                className="flex-1 bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high font-mono outline-none focus:border-primary transition-colors"
++              />
++            </div>
++          </div>
++        </div>
++      </section>
++
++      {/* Payment Methods - Draggable */}
++      <section className="rounded-lg border border-border bg-surface p-5">
++        <div className="flex items-center justify-between mb-4">
++          <h2 className="text-xs font-semibold text-text-high tracking-widest uppercase">
++            Payment Methods
++          </h2>
++          <span className="text-[10px] text-text-low">Drag to reorder</span>
++        </div>
++
++        <div className="space-y-2">
++          {enabledMethods.map((method) => {
++            const isDragged = dragState.draggedId === method.id;
++            const isDraggedOver = dragState.draggedOverId === method.id;
++            const methodFull = methods.find((m) => m.id === method.id)!;
++
++            return (
++              <div
++                key={method.id}
++                draggable
++                onDragStart={() => handleDragStart(method.id)}
++                onDragOver={(e) => handleDragOver(e, method.id)}
++                onDrop={(e) => handleDrop(e, method.id)}
++                onDragEnd={handleDragEnd}
++                className={`rounded-md border transition-all cursor-move ${
++                  isDragged
++                    ? "border-primary opacity-50"
++                    : isDraggedOver
++                    ? "border-primary bg-primary-bg"
++                    : "border-border bg-bg"
++                }`}
++              >
++                <div className="px-4 py-3 flex items-center gap-3">
++                  <div className="text-text-low cursor-grab active:cursor-grabbing">
++                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
++                      <circle cx="2" cy="3" r="1.5" />
++                      <circle cx="7" cy="3" r="1.5" />
++                      <circle cx="12" cy="3" r="1.5" />
++                      <circle cx="2" cy="7" r="1.5" />
++                      <circle cx="7" cy="7" r="1.5" />
++                      <circle cx="12" cy="7" r="1.5" />
++                      <circle cx="2" cy="11" r="1.5" />
++                      <circle cx="7" cy="11" r="1.5" />
++                      <circle cx="12" cy="11" r="1.5" />
++                    </svg>
++                  </div>
++                  <label className="flex items-center gap-2 cursor-pointer">
++                    <input
++                      type="checkbox"
++                      checked={methodFull.enabled}
++                      onChange={() => toggleMethod(method.id)}
++                      className="accent-primary rounded"
++                    />
++                    <span className="text-xs font-medium text-text-high">{method.label}</span>
++                  </label>
++                  <span className="text-[10px] text-text-low ml-auto">Order #{method.order}</span>
++                </div>
++
++                {methodFull.enabled && (
++                  <div className="border-t border-border px-4 py-3">
++                    {/* Cards - Credit / Debit split, each with issuer / network / IIN filters */}
++                    {method.id === "card" && (
++                      <div className="space-y-4">
++                        {(["credit", "debit"] as const).map((cardType) => {
++                          const enabledKey = cardType === "credit" ? "creditEnabled" : "debitEnabled";
++                          const issuersKey = cardType === "credit" ? "creditIssuers" : "debitIssuers";
++                          const networksKey = cardType === "credit" ? "creditNetworks" : "debitNetworks";
++                          const typeEnabled = methodFull.config[enabledKey] !== false;
++                          return (
++                            <div key={cardType} className="space-y-2">
++                              <label className="flex items-center gap-2 cursor-pointer">
++                                <input
++                                  type="checkbox"
++                                  checked={typeEnabled}
++                                  onChange={() =>
++                                    updateMethodConfig("card", { [enabledKey]: !typeEnabled })
++                                  }
++                                  className="accent-primary rounded"
++                                />
++                                <span className="text-[10px] text-text-medium uppercase tracking-wider">
++                                  {cardType === "credit" ? "Credit Cards" : "Debit Cards"}
++                                </span>
++                              </label>
++                              {typeEnabled && (
++                                <div className="pl-6 space-y-3">
++                                  <div className="space-y-1.5">
++                                    <p className="text-[10px] text-text-low">
++                                      Issuing banks. Leave empty to allow all.
++                                    </p>
++                                    <div className="flex flex-wrap gap-1.5">
++                                      {BANK_ISSUERS.map((issuer) => {
++                                        const selected =
++                                          methodFull.config[issuersKey]?.includes(issuer.code) || false;
++                                        return (
++                                          <button
++                                            key={issuer.code}
++                                            onClick={() => toggleIssuer("card", issuer.code, issuersKey)}
++                                            className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all border ${
++                                              selected
++                                                ? "border-primary bg-primary-bg text-primary"
++                                                : "border-border bg-surface text-text-medium hover:border-primary/40"
++                                            }`}
++                                          >
++                                            {issuer.name}
++                                          </button>
++                                        );
++                                      })}
++                                    </div>
++                                  </div>
++                                  <div className="space-y-1.5">
++                                    <p className="text-[10px] text-text-low">
++                                      Card networks. Leave empty to allow all.
++                                    </p>
++                                    <div className="flex flex-wrap gap-1.5">
++                                      {CARD_NETWORKS.map((network) => {
++                                        const selected =
++                                          methodFull.config[networksKey]?.includes(network.code) || false;
++                                        return (
++                                          <button
++                                            key={network.code}
++                                            onClick={() => toggleIssuer("card", network.code, networksKey)}
++                                            className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all border ${
++                                              selected
++                                                ? "border-primary bg-primary-bg text-primary"
++                                                : "border-border bg-surface text-text-medium hover:border-primary/40"
++                                            }`}
++                                          >
++                                            {network.name}
++                                          </button>
++                                        );
++                                      })}
++                                    </div>
++                                  </div>
++                                </div>
++                              )}
++                            </div>
++                          );
++                        })}
++                      </div>
++                    )}
++
++                    {/* Net Banking - Bank issuers */}
++                    {method.id === "netbanking" && (
++                      <div className="space-y-2">
++                        <p className="text-[10px] text-text-medium uppercase tracking-wider">
++                          Preferred Banks
++                        </p>
++                        <p className="text-[10px] text-text-low">
++                          Select banks to show at the top. Leave empty for default list.
++                        </p>
++                        <div className="flex flex-wrap gap-1.5">
++                          {BANK_ISSUERS.map((bank) => {
++                            const selected = methodFull.config.banks?.includes(bank.code) || false;
++                            return (
++                              <button
++                                key={bank.code}
++                                onClick={() => toggleIssuer("netbanking", bank.code, "banks")}
++                                className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all border ${
++                                  selected
++                                    ? "border-primary bg-primary-bg text-primary"
++                                    : "border-border bg-surface text-text-medium hover:border-primary/40"
++                                }`}
++                              >
++                                {bank.name}
++                              </button>
++                            );
++                          })}
++                        </div>
++                      </div>
++                    )}
++
++                    {/* UPI - Intent only, no Collect flow */}
++                    {method.id === "upi" && (
++                      <div className="space-y-2">
++                        <p className="text-[10px] text-text-medium uppercase tracking-wider">
++                          UPI Configuration
++                        </p>
++                        <p className="text-[10px] text-text-low">
++                          Intent flow only — the customer picks their UPI app directly. Collect
++                          (VPA entry) is disabled.
++                        </p>
++                      </div>
++                    )}
++
++                    {/* Wallets */}
++                    {method.id === "wallet" && (
++                      <div className="space-y-2">
++                        <p className="text-[10px] text-text-medium uppercase tracking-wider">
++                          Allowed Wallets
++                        </p>
++                        <p className="text-[10px] text-text-low">
++                          Select wallets to display. Leave empty to show all.
++                        </p>
++                        <div className="flex flex-wrap gap-1.5">
++                          {WALLETS.map((wallet) => {
++                            const selected = methodFull.config.wallets?.includes(wallet.code) || false;
++                            return (
++                              <button
++                                key={wallet.code}
++                                onClick={() => toggleWallet(wallet.code)}
++                                className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all border ${
++                                  selected
++                                    ? "border-primary bg-primary-bg text-primary"
++                                    : "border-border bg-surface text-text-medium hover:border-primary/40"
++                                }`}
++                              >
++                                {wallet.name}
++                              </button>
++                            );
++                          })}
++                        </div>
++                      </div>
++                    )}
++
++                    {/* EMI */}
++                    {method.id === "emi" && (
++                      <div className="space-y-2">
++                        <p className="text-[10px] text-text-medium uppercase tracking-wider">
++                          EMI Banks
++                        </p>
++                        <div className="flex flex-wrap gap-1.5">
++                          {BANK_ISSUERS.map((bank) => {
++                            const selected = methodFull.config.issuers?.includes(bank.code) || false;
++                            return (
++                              <button
++                                key={bank.code}
++                                onClick={() => toggleIssuer("emi", bank.code, "issuers")}
++                                className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all border ${
++                                  selected
++                                    ? "border-primary bg-primary-bg text-primary"
++                                    : "border-border bg-surface text-text-medium hover:border-primary/40"
++                                }`}
++                              >
++                                {bank.name}
++                              </button>
++                            );
++                          })}
++                        </div>
++                      </div>
++                    )}
++
++                    {/* Pay Later */}
++                    {method.id === "paylater" && (
++                      <div className="space-y-2">
++                        <p className="text-[10px] text-text-medium uppercase tracking-wider">
++                          Pay Later Providers
++                        </p>
++                        <div className="flex flex-wrap gap-1.5">
++                          {PAYLATER_PROVIDERS.map((provider) => {
++                            const selected = methodFull.config.providers?.includes(provider.code) || false;
++                            return (
++                              <button
++                                key={provider.code}
++                                onClick={() => togglePaylaterProvider(provider.code)}
++                                className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-all border ${
++                                  selected
++                                    ? "border-primary bg-primary-bg text-primary"
++                                    : "border-border bg-surface text-text-medium hover:border-primary/40"
++                                }`}
++                              >
++                                {provider.name}
++                              </button>
++                            );
++                          })}
++                        </div>
++                      </div>
++                    )}
++                  </div>
++                )}
++              </div>
++            );
++          })}
++        </div>
++
++        {/* Disabled methods */}
++        <div className="mt-3 space-y-2">
++          {methods
++            .filter((m) => !m.enabled)
++            .map((method) => (
++              <div
++                key={method.id}
++                className="rounded-md border border-border bg-bg opacity-60"
++              >
++                <div className="px-4 py-2.5 flex items-center gap-3">
++                  <div className="text-text-low opacity-40">
++                    <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
++                      <circle cx="2" cy="3" r="1.5" />
++                      <circle cx="7" cy="3" r="1.5" />
++                      <circle cx="12" cy="3" r="1.5" />
++                      <circle cx="2" cy="7" r="1.5" />
++                      <circle cx="7" cy="7" r="1.5" />
++                      <circle cx="12" cy="7" r="1.5" />
++                      <circle cx="2" cy="11" r="1.5" />
++                      <circle cx="7" cy="11" r="1.5" />
++                      <circle cx="12" cy="11" r="1.5" />
++                    </svg>
++                  </div>
++                  <label className="flex items-center gap-2 cursor-pointer">
++                    <input
++                      type="checkbox"
++                      checked={false}
++                      onChange={() => toggleMethod(method.id)}
++                      className="accent-primary rounded"
++                    />
++                    <span className="text-xs text-text-medium">{method.label}</span>
++                  </label>
++                </div>
++              </div>
++            ))}
++        </div>
++      </section>
++
++      {/* Generated Code */}
++      <CheckoutCodePreview code={code} onCopy={copyCode} copied={copied} />
++
++      {/* Test Button */}
++      <div className="flex items-center gap-3">
++        <button
++          onClick={testCheckout}
++          className="px-5 py-2.5 bg-primary text-white text-xs font-semibold rounded-md hover:bg-primary-hover transition-all"
++        >
++          Test Live Checkout
++        </button>
++        <p className="text-[10px] text-text-low">
++          Requires a valid key. Order ID is optional — this will open the actual Razorpay checkout.
++        </p>
++      </div>
++
++      {/* Test Result Modal */}
++      {showTestModal && (
++        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
++          <div className="max-w-lg w-full rounded-xl border border-border bg-surface p-6 shadow-2xl">
++            <div className="flex items-center justify-between mb-4">
++              <h3 className="text-sm font-semibold text-text-high">
++                {testResult.startsWith("Payment Success") ? "Success" : testResult.startsWith("Payment Failed") ? "Failed" : "Info"}
++              </h3>
++              <button
++                onClick={() => setShowTestModal(false)}
++                className="text-text-low hover:text-text-high transition-colors"
++              >
++                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
++                  <path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z" />
++                </svg>
++              </button>
++            </div>
++            <pre className="bg-bg border border-border rounded-md p-4 text-xs text-text-medium whitespace-pre-wrap font-mono leading-relaxed">
++              {testResult}
++            </pre>
++            <button
++              onClick={() => setShowTestModal(false)}
++              className="mt-4 w-full py-2 bg-primary-bg border border-primary/30 text-primary text-xs font-semibold rounded-md hover:bg-primary/20 transition-all"
++            >
++              Close
++            </button>
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
+diff --git a/components/CheckoutCodePreview.tsx b/components/CheckoutCodePreview.tsx
+new file mode 100644
+index 0000000..c44be84
+--- /dev/null
++++ b/components/CheckoutCodePreview.tsx
+@@ -0,0 +1,37 @@
++"use client";
++
++interface CheckoutCodePreviewProps {
++  code: string;
++  onCopy: () => void;
++  copied: boolean;
++}
++
++export function CheckoutCodePreview({ code, onCopy, copied }: CheckoutCodePreviewProps) {
++  return (
++    <section className="rounded-lg border border-border bg-surface overflow-hidden">
++      <div className="px-5 py-3 border-b border-border flex items-center justify-between">
++        <div>
++          <h2 className="text-xs font-semibold text-text-high tracking-widest uppercase">
++            Generated Checkout Code
++          </h2>
++          <p className="text-[10px] text-text-low mt-0.5">
++            Copy this code and include Razorpay script in your HTML
++          </p>
++        </div>
++        <div className="flex items-center gap-2">
++          <button
++            onClick={onCopy}
++            className="px-3 py-1.5 bg-primary-bg border border-primary/30 text-primary text-[10px] font-semibold rounded-md hover:bg-primary/20 transition-all"
++          >
++            {copied ? "Copied!" : "Copy Code"}
++          </button>
++        </div>
++      </div>
++      <div className="relative">
++        <pre className="max-h-96 overflow-auto p-5 text-[11px] leading-relaxed text-text-medium font-mono whitespace-pre-wrap">
++          <code>{code}</code>
++        </pre>
++      </div>
++    </section>
++  );
++}
+diff --git a/components/Sidebar.tsx b/components/Sidebar.tsx
+index ae04601..a498691 100644
+--- a/components/Sidebar.tsx
++++ b/components/Sidebar.tsx
+@@ -14,7 +14,25 @@ const NavSection = memo(function NavSection() {
+ 
+   return (
+     <nav className="px-4 py-4 space-y-1">
+-      <p className="text-[10px] text-text-low tracking-widest uppercase mb-2 px-2">Endpoints</p>
++      <p className="text-[10px] text-text-low tracking-widest uppercase mb-2 px-2">Tools</p>
++      <Link
++        href="/checkout"
++        className={`block w-full text-left text-xs py-2 px-2 rounded-md transition-colors ${
++          pathname === "/checkout"
++            ? "bg-primary-bg text-primary font-medium"
++            : "text-text-medium hover:text-text-high hover:bg-surface-hover"
++        }`}
++      >
++        <span className="flex items-center gap-2">
++          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className="shrink-0">
++            <path d="M11 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h6zm-1 0a1 1 0 0 0 1 1H5a1 1 0 0 0 1-1h4z"/>
++            <path d="M5 15a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5zm-1-1h6V2H4v12z"/>
++            <path d="M8 11a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm0 1a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
++          </svg>
++          Checkout Builder
++        </span>
++      </Link>
++      <p className="text-[10px] text-text-low tracking-widest uppercase mt-4 mb-2 px-2">Endpoints</p>
+       {endpointGroups.map((g) => {
+         const slug = groupSlugMap[g.group];
+         const href = `/${slug}`;
+diff --git a/lib/checkoutConfig.ts b/lib/checkoutConfig.ts
+new file mode 100644
+index 0000000..e42699d
+--- /dev/null
++++ b/lib/checkoutConfig.ts
+@@ -0,0 +1,369 @@
++export interface PaymentMethodConfig {
++  id: string;
++  label: string;
++  enabled: boolean;
++  order: number;
++  provider: string;
++  config: Record<string, any>;
++}
++
++export interface CheckoutOptions {
++  key: string;
++  amount: number;
++  currency: string;
++  name: string;
++  description: string;
++  image: string;
++  order_id?: string;
++  prefill: {
++    name: string;
++    email: string;
++    contact: string;
++    method?: string;
++  };
++  notes: Record<string, string>;
++  theme: {
++    color: string;
++  };
++  modal: {
++    ondismiss?: boolean;
++    escape?: boolean;
++    backdropclose?: boolean;
++  };
++  config: {
++    display: {
++      // Entries are objects like { method: "wallet" }, not plain strings, per
++      // https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/configure-payment-methods/display-configuration/
++      hide: { method: string }[];
++      // Keyed by an arbitrary block id (e.g. "banks", "card", "other") -
++      // each key maps to exactly one block definition, per
++      // https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/configure-payment-methods/understand-configuration/#card
++      blocks: Record<string, { name: string; instruments: Record<string, any>[] }>;
++      sequence: string[];
++      preferences: {
++        show_default_blocks: boolean;
++      };
++    };
++  };
++}
++
++export const PAYMENT_METHODS: PaymentMethodConfig[] = [
++  {
++    id: "card",
++    label: "Cards",
++    enabled: true,
++    order: 1,
++    provider: "razorpay",
++    config: {
++      creditEnabled: true,
++      debitEnabled: true,
++      creditIssuers: [],
++      debitIssuers: [],
++      creditNetworks: [],
++      debitNetworks: [],
++    },
++  },
++  {
++    id: "netbanking",
++    label: "Net Banking",
++    enabled: true,
++    order: 2,
++    provider: "razorpay",
++    config: { banks: [] },
++  },
++  {
++    id: "upi",
++    label: "UPI",
++    enabled: true,
++    order: 3,
++    provider: "razorpay",
++    config: { flow: "intent" },
++  },
++  {
++    id: "wallet",
++    label: "Wallets",
++    enabled: true,
++    order: 4,
++    provider: "razorpay",
++    config: { wallets: [] },
++  },
++  {
++    id: "emi",
++    label: "EMI",
++    enabled: false,
++    order: 5,
++    provider: "razorpay",
++    config: { issuers: [] },
++  },
++  {
++    id: "paylater",
++    label: "Pay Later",
++    enabled: false,
++    order: 6,
++    provider: "razorpay",
++    config: { providers: [] },
++  },
++];
++
++export const BANK_ISSUERS = [
++  { code: "HDFC", name: "HDFC Bank" },
++  { code: "ICIC", name: "ICICI Bank" },
++  { code: "SBI", name: "State Bank of India" },
++  { code: "AXIS", name: "Axis Bank" },
++  { code: "KKBK", name: "Kotak Mahindra Bank" },
++  { code: "YESB", name: "Yes Bank" },
++  { code: "PUNB", name: "Punjab National Bank" },
++  { code: "BARB_R", name: "Bank of Baroda" },
++  { code: "UTIB", name: "Axis Bank (UTIB)" },
++  { code: "INDB", name: "IndusInd Bank" },
++  { code: "FEDERAL", name: "Federal Bank" },
++  { code: "IDB", name: "IDBI Bank" },
++];
++
++// Card network values for the `networks` field on a card instrument.
++// Per https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/configure-payment-methods/understand-configuration/#card
++export const CARD_NETWORKS = [
++  { code: "Visa", name: "Visa" },
++  { code: "MasterCard", name: "Mastercard" },
++  { code: "Maestro", name: "Maestro" },
++  { code: "RuPay", name: "RuPay" },
++  { code: "Amex", name: "American Express" },
++  { code: "Diners Club", name: "Diners Club" },
++  { code: "Discover", name: "Discover" },
++];
++
++export const WALLETS = [
++  { code: "payzapp", name: "PayZapp" },
++  { code: "olamoney", name: "Ola Money" },
++  { code: "mobikwik", name: "MobiKwik" },
++  { code: "freecharge", name: "FreeCharge" },
++  { code: "jiomoney", name: "JioMoney" },
++  { code: "airtelmoney", name: "Airtel Money" },
++  { code: "paytm", name: "Paytm" },
++  { code: "amazonpay", name: "Amazon Pay" },
++  { code: "phonepe", name: "PhonePe" },
++];
++
++export const CURRENCY_PRESETS = ["INR", "USD", "EUR", "GBP"];
++
++export const PAYLATER_PROVIDERS = [
++  { code: "hdfc", name: "HDFC FlexiPay" },
++  { code: "icici", name: "ICICI PayLater" },
++  { code: "simpl", name: "Simpl" },
++  { code: "lazypay", name: "LazyPay" },
++  { code: "kotak", name: "Kotak PayLater" },
++];
++
++export const DEFAULT_CHECKOUT_OPTIONS: CheckoutOptions = {
++  key: "rzp_test_",
++  amount: 50000,
++  currency: "INR",
++  name: "Acme Corp",
++  description: "Test Transaction",
++  image: "https://your-logo-url.png",
++  order_id: "",
++  prefill: {
++    name: "Gaurav Kumar",
++    email: "gaurav.kumar@example.com",
++    contact: "9999999999",
++  },
++  notes: {
++    address: "Razorpay Corporate Office",
++  },
++  theme: {
++    color: "#528FF0",
++  },
++  modal: {
++    ondismiss: true,
++    escape: true,
++    backdropclose: true,
++  },
++  config: {
++    display: {
++      hide: [],
++      blocks: {
++        card: { name: "Cards", instruments: [] },
++        banks: { name: "Net Banking", instruments: [] },
++        upi: { name: "UPI", instruments: [] },
++      },
++      sequence: [],
++      preferences: {
++        show_default_blocks: true,
++      },
++    },
++  },
++};
++
++export function generateCheckoutCode(options: CheckoutOptions): string {
++  const displayOptions: any = { ...options };
++  if (!displayOptions.order_id) {
++    delete displayOptions.order_id;
++  }
++
++  const showOndismiss = Boolean(displayOptions.modal?.ondismiss);
++  if (displayOptions.modal) {
++    const restModal = { ...displayOptions.modal };
++    delete restModal.ondismiss;
++    displayOptions.modal = restModal;
++  }
++
++  let json = JSON.stringify(displayOptions, null, 2);
++  if (showOndismiss) {
++    json = json.replace(
++      /"modal":\s*\{/,
++      `"modal": {\n    "ondismiss": function () {\n      console.log('Checkout form closed by user');\n    },`
++    );
++  }
++
++  return `var options = ${json};
++
++var rzp1 = new Razorpay(options);
++rzp1.on('payment.failed', function (response){
++  alert(response.error.code);
++  alert(response.error.description);
++  alert(response.error.source);
++  alert(response.error.step);
++  alert(response.error.reason);
++  alert(response.error.metadata.order_id);
++  alert(response.error.metadata.payment_id);
++});
++
++document.getElementById('rzp-button1').onclick = function(e){
++  rzp1.open();
++  e.preventDefault();
++}`;
++}
++
++export function buildCheckoutOptions(
++  base: CheckoutOptions,
++  methods: PaymentMethodConfig[]
++): CheckoutOptions {
++  const enabled = methods.filter((m) => m.enabled).sort((a, b) => a.order - b.order);
++  const hide: { method: string }[] = [];
++
++  // sequence holds either `block.<code>` (for methods we render as a custom
++  // block) or the bare method name (for methods shown via Razorpay defaults).
++  // Per https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/configure-payment-methods/understand-configuration/
++  // every `block.<code>` entry must reference a block actually present in
++  // `blocks`, so a code is only added here once its block exists.
++  const sequence: string[] = [];
++  const blocksMap: Record<string, { name: string; instruments: Record<string, any>[] }> = {};
++
++  const BLOCK_DISPLAY_NAMES: Record<string, string> = {
++    card: "Cards",
++    banks: "Net Banking",
++    upi: "UPI",
++    wallet: "Wallets",
++    emi: "EMI",
++    paylater: "Pay Later",
++  };
++
++  const addBlock = (code: string, instruments: Record<string, any>[]) => {
++    blocksMap[code] = {
++      name: BLOCK_DISPLAY_NAMES[code] || code,
++      instruments,
++    };
++    sequence.push(`block.${code}`);
++  };
++
++  enabled.forEach((m) => {
++    if (m.id === "card") {
++      const creditEnabled = m.config.creditEnabled !== false;
++      const debitEnabled = m.config.debitEnabled !== false;
++
++      if (!creditEnabled && !debitEnabled) {
++        hide.push({ method: "card" });
++        return;
++      }
++
++      const creditIssuers: string[] = m.config.creditIssuers || [];
++      const debitIssuers: string[] = m.config.debitIssuers || [];
++      const creditNetworks: string[] = m.config.creditNetworks || [];
++      const debitNetworks: string[] = m.config.debitNetworks || [];
++
++      const creditHasFilter = creditIssuers.length > 0 || creditNetworks.length > 0;
++      const debitHasFilter = debitIssuers.length > 0 || debitNetworks.length > 0;
++
++      // With no type restriction and no issuer/network filters, let the
++      // default card listing stand rather than emitting an explicit block.
++      if (creditEnabled && debitEnabled && !creditHasFilter && !debitHasFilter) {
++        sequence.push("card");
++        return;
++      }
++
++      const instruments: any[] = [];
++      if (creditEnabled) {
++        const instrument: any = { method: "card", types: ["credit"] };
++        if (creditIssuers.length > 0) instrument.issuers = creditIssuers;
++        if (creditNetworks.length > 0) instrument.networks = creditNetworks;
++        instruments.push(instrument);
++      }
++      if (debitEnabled) {
++        const instrument: any = { method: "card", types: ["debit"] };
++        if (debitIssuers.length > 0) instrument.issuers = debitIssuers;
++        if (debitNetworks.length > 0) instrument.networks = debitNetworks;
++        instruments.push(instrument);
++      }
++      addBlock("card", instruments);
++    } else if (m.id === "netbanking") {
++      const banks: string[] = m.config.banks || [];
++      if (banks.length > 0) {
++        // The API key is `banks`, not `issuers`.
++        addBlock("banks", [{ method: "netbanking", banks }]);
++      } else {
++        sequence.push("netbanking");
++      }
++    } else if (m.id === "upi") {
++      sequence.push("upi");
++    } else if (m.id === "wallet") {
++      const wallets: string[] = m.config.wallets || [];
++      if (wallets.length > 0) {
++        addBlock("wallet", [{ method: "wallet", wallets }]);
++      } else {
++        sequence.push("wallet");
++      }
++    } else if (m.id === "emi") {
++      const issuers: string[] = m.config.issuers || [];
++      if (issuers.length > 0) {
++        addBlock("emi", [{ method: "emi", issuers }]);
++      } else {
++        sequence.push("emi");
++      }
++    } else if (m.id === "paylater") {
++      const providers: string[] = m.config.providers || [];
++      if (providers.length > 0) {
++        addBlock("paylater", [{ method: "paylater", providers }]);
++      } else {
++        sequence.push("paylater");
++      }
++    }
++  });
++
++  const disabled = methods.filter((m) => !m.enabled);
++  disabled.forEach((m) => {
++    hide.push({ method: m.id });
++  });
++
++  // When the user has configured any custom blocks, show only those (defaults
++  // off). When none are configured, let Razorpay show its defaults (on).
++  const hasCustomBlocks = Object.keys(blocksMap).length > 0;
++
++  const built: CheckoutOptions = { ...base };
++  if (!built.order_id) {
++    delete built.order_id;
++  }
++
++  return {
++    ...built,
++    config: {
++      display: {
++        hide,
++        blocks: blocksMap,
++        sequence,
++        preferences: {
++          show_default_blocks: !hasCustomBlocks,
++        },
++      },
++    },
++  };
++}
+diff --git a/lib/endpoint.ts b/lib/endpoint.ts
+index 5e3fa5f..43fcdf4 100644
+--- a/lib/endpoint.ts
++++ b/lib/endpoint.ts
+@@ -82,7 +82,7 @@ export const endpointGroups: EndpointGroup[] = [
+                 id: "create_refund",
+                 label: "Create Refund",
+                 method: "POST",
+-                url: "https://api.razorpay.com/v1/payments/:payment_id/refund",
++                url: "https://api.razorpay.com/v1/payments/:payment_id/refunds",
+                 params: ["payment_id"],
+                 variants: [
+                     { label: "Normal Refund", key: "normal" },
+@@ -187,7 +187,7 @@ export const endpointGroups: EndpointGroup[] = [
+                 id: "create_payment_link",
+                 label: "Create Payment Link",
+                 method: "POST",
+-                url: "https://api.razorpay.com/v1/payment_links/",
++                url: "https://api.razorpay.com/v1/payment_links",
+                 variants: [
+                     { label: "Standard Payment Link", key: "standard_payment_link" },
+                     { label: "UPI Payment Link", key: "upi_payment_link" },
+@@ -298,13 +298,6 @@ export const endpointGroups: EndpointGroup[] = [
+                 method: "GET",
+                 url: "https://api.razorpay.com/v1/payments/qr_codes",
+             },
+-            {
+-                id: "fetch_qr_code_for_a_customer",
+-                label: "Fetch QR Code For A Customer",
+-                method: "GET",
+-                url: "https://api.razorpay.com/v1/payments/customers/:customer_id/qr_codes",
+-                params: ["customer_id"],
+-            },
+             {
+                 id: "fetch_qr_code_payment",
+                 label: "Fetch QR Code Payment",
+@@ -312,13 +305,6 @@ export const endpointGroups: EndpointGroup[] = [
+                 url: "https://api.razorpay.com/v1/payments/qr_codes/:qr_code_id/payments",
+                 params: ["qr_code_id"],
+             },
+-            {
+-                id: "fetch_qr_code_payment_by_id",
+-                label: "Fetch QR Code Payment By ID",
+-                method: "GET",
+-                url: "https://api.razorpay.com/v1/payments/qr_codes/:qr_code_id/payments/:payment_id",
+-                params: ["qr_code_id", "payment_id"],
+-            },
+             {
+                 id: "close_qr_code",
+                 label: "Close QR Code",
+@@ -822,7 +808,7 @@ export const endpointGroups: EndpointGroup[] = [
+                 id: "Fetch Transfers by Order",
+                 label: "Fetch Transfers by Order",
+                 method: "GET",
+-                url: "https://api.razorpay.com/v1/orders/:order_id/?expand[]=transfers&status=processing",
++                url: "https://api.razorpay.com/v1/orders/:order_id?expand[]=transfers&status=processing",
+                 params: ["order_id"],
+             },
+             {
