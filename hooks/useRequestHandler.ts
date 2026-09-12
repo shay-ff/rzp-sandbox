@@ -57,6 +57,8 @@ export function useRequestHandler(
 
   const sendRequest = useCallback(
     async (ep: Endpoint) => {
+      const requestStartedAt = new Date().toISOString();
+      const requestStartedTime = performance.now();
       clearCopyStatus(ep.id);
       setLoading((p) => ({ ...p, [ep.id]: true }));
       setResponses((p) => ({ ...p, [ep.id]: null }));
@@ -85,6 +87,7 @@ export function useRequestHandler(
         }
 
         const responsePreview = getResponsePreviewText(data);
+        const completedAt = new Date().toISOString();
         const historyEntry: RequestHistoryEntry = {
           id: createHistoryId(),
           endpointId: ep.id,
@@ -97,7 +100,9 @@ export function useRequestHandler(
           responsePreview: truncateText(responsePreview, 1800),
           responseTruncated: responsePreview.length > 1800,
           status: res.status,
-          timestamp: new Date().toISOString(),
+          timestamp: requestStartedAt,
+          completedAt,
+          latencyMs: Math.round(performance.now() - requestStartedTime),
           variantKey: selectedVariants[ep.id],
         };
 
@@ -106,6 +111,7 @@ export function useRequestHandler(
         const message = error instanceof Error ? error.message : "Request failed";
         setResponses((p) => ({ ...p, [ep.id]: { error: message } }));
         const errorUrl = resolveUrl(urlValues[ep.id] || ep.url || "", urlParamValues[ep.id] || {});
+        const completedAt = new Date().toISOString();
         await saveRequestHistory({
           id: createHistoryId(),
           endpointId: ep.id,
@@ -118,7 +124,9 @@ export function useRequestHandler(
           responsePreview: message,
           responseTruncated: false,
           status: null,
-          timestamp: new Date().toISOString(),
+          timestamp: requestStartedAt,
+          completedAt,
+          latencyMs: Math.round(performance.now() - requestStartedTime),
           variantKey: selectedVariants[ep.id],
         });
       } finally {

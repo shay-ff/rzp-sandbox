@@ -32,7 +32,7 @@ function buildEndpointState() {
       }
       if (endpoint.params) {
         urlParamValues[endpoint.id] = endpoint.params.reduce<Record<string, string>>((acc, param) => {
-          acc[param] = "";
+          acc[param] = endpoint.defaultParams?.[param] || "";
           return acc;
         }, {});
       }

@@ -9,6 +9,7 @@ import { GroupHeader } from "@/components/GroupHeader";
 import { EndpointCard } from "@/components/EndpointCard";
 import { FilterBar } from "@/components/FilterBar";
 import { HistoryPanel } from "@/components/HistoryPanel";
+import { METHOD_COLORS } from "@/lib/utils/helpers";
 import type { EndpointMethodFilter } from "@/lib/utils/constants";
 
 export default function GroupPage() {
@@ -85,7 +86,14 @@ export default function GroupPage() {
                       href={`#${endpoint.id}`}
                       className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-text-medium hover:bg-surface-hover hover:text-text-high transition-colors"
                     >
-                      <span className="w-8 shrink-0 text-[10px] font-bold text-success">{endpoint.method}</span>
+                      <span
+                        className={`inline-flex shrink-0 items-center justify-center rounded border px-1.5 py-0.5 text-[9px] font-bold ${
+                          METHOD_COLORS[endpoint.method as keyof typeof METHOD_COLORS] ||
+                          "text-text-medium bg-surface border-border"
+                        }`}
+                      >
+                        {endpoint.method}
+                      </span>
                       <span className="truncate">{endpoint.label}</span>
                     </a>
                   ))}
@@ -112,6 +120,14 @@ export default function GroupPage() {
           </section>
         </div>
       </main>
+      <button
+        type="button"
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className="fixed bottom-20 right-3 z-40 rounded-full border border-border bg-surface/95 px-3 py-2 text-[10px] font-semibold text-text-medium shadow-lg shadow-black/10 backdrop-blur transition-colors hover:border-primary/40 hover:text-text-high sm:bottom-6 sm:right-6"
+        title="Back to top"
+      >
+        ↑ top
+      </button>
       <HistoryPanel />
     </div>
   );

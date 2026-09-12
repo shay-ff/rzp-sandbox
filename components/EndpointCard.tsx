@@ -11,6 +11,7 @@ import {
   getResponsePreviewText,
   getResponseRawCopyText,
   resolveUrl,
+  formatUrlForDisplay,
 } from "@/lib/utils/helpers";
 import { MethodBadge } from "./MethodBadge";
 
@@ -18,6 +19,25 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false 
 
 const URL_PATTERN = /(https?:\/\/[^\s"'<>]+)/g;
 const isUrlPart = (part: string) => /^https?:\/\/[^\s"'<>]+$/.test(part);
+
+const getParameterPlaceholder = (param: string) => {
+  switch (param) {
+    case "payment_id":
+      return "pay_...";
+    case "customer_id":
+      return "cust_...";
+    case "order_id":
+      return "order_...";
+    case "from":
+    case "to":
+      return "Unix timestamp";
+    case "count":
+    case "skip":
+      return "e.g. 2";
+    default:
+      return `Enter ${param.replace(/_/g, " ")}`;
+  }
+};
 
 function LinkifiedText({ text }: { text: string }) {
   return (
@@ -88,6 +108,11 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
   return (
     <div
       id={ep.id}
+      onKeyDown={(event) => {
+        if (!(event.metaKey || event.ctrlKey) || event.key !== "Enter") return;
+        event.preventDefault();
+        if (!isCheckout && !loading[ep.id] && credentials.credsSaved) sendRequest(ep);
+      }}
       className="scroll-mt-24 border border-border rounded-lg bg-surface overflow-hidden"
     >
       <div className="px-4 sm:px-5 py-3 border-b border-border flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -141,7 +166,7 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
               <div className="flex items-stretch gap-2">
                 <input
                   value={ep.params && ep.params.length > 0
-                    ? resolveUrl(urlValues[ep.id] || ep.url || "", urlParamValues[ep.id] || {})
+                    ? formatUrlForDisplay(urlValues[ep.id] || ep.url || "", urlParamValues[ep.id] || {})
                     : (urlValues[ep.id] || ep.url || "")
                   }
                   readOnly={ep.params && ep.params.length > 0}
@@ -184,12 +209,12 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                       <span className="text-error"> *</span>
                     </label>
                     <input
-                      placeholder={param}
+                      placeholder={getParameterPlaceholder(param)}
                       value={urlParamValues[ep.id]?.[param] || ""}
                       onChange={(e) =>
                         setUrlParamValues((p) => ({
                           ...p,
-                          [ep.id]: { ...p[ep.id], [param]: e.target.value },
+                          [ep.id]: { ...p[ep.id], [param]: e.target.value.replace(/\s/g, "") },
                         }))
                       }
                       className="w-full bg-bg border border-border rounded-md px-3 py-1.5 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors font-mono"

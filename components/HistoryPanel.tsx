@@ -211,6 +211,10 @@ export function HistoryPanel() {
                                           <span className="text-[10px] tracking-widest text-text-medium uppercase">Request</span>
                                         </div>
                                         <div className="space-y-3 text-xs text-text-high">
+                                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-text-medium">
+                                            <span>{new Date(item.timestamp).toLocaleString()}</span>
+                                            {typeof item.latencyMs === "number" && <span>{item.latencyMs} ms response</span>}
+                                          </div>
                                           <div>
                                             <p className="text-[10px] uppercase tracking-widest text-text-medium mb-1">URL</p>
                                             <p className="break-all font-mono text-[11px] text-text-medium">{item.url || "-"}</p>

@@ -11,6 +11,8 @@ export interface RequestHistoryEntry {
   responseTruncated: boolean;
   status: number | null;
   timestamp: string;
+  completedAt?: string;
+  latencyMs?: number;
   variantKey?: string;
 }
 

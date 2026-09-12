@@ -28,8 +28,8 @@ export const createHistoryId = () => {
 
 export const METHOD_COLORS = {
   GET: "text-success bg-success-bg border-success/30",
-  POST: "text-primary bg-primary-bg border-primary/30",
-  PUT: "text-amber bg-amber-bg border-amber/30",
+  POST: "text-amber bg-amber-bg border-amber/30",
+  PUT: "text-primary bg-primary-bg border-primary/30",
   PATCH: "text-purple-400 bg-purple-400/10 border-purple-400/20",
   DELETE: "text-error bg-error-bg border-error/30",
   CHECKOUT: "text-cyan-400 bg-cyan-400/10 border-cyan-400/20",
@@ -101,7 +101,25 @@ export const resolveUrl = (url: string | null, params: Record<string, string>) =
   Object.entries(params).forEach(([key, value]) => {
     resolved = resolved.replace(new RegExp(`:${key}\\b`, "g"), value);
   });
-  return resolved;
+  const [path, query] = resolved.split("?");
+  if (!query) return path;
+  const queryParams = query.split("&").filter((parameter) => {
+    const separatorIndex = parameter.indexOf("=");
+    return separatorIndex === -1 || parameter.slice(separatorIndex + 1) !== "";
+  });
+  return queryParams.length ? `${path}?${queryParams.join("&")}` : path;
+};
+
+export const formatUrlForDisplay = (url: string | null, params: Record<string, string>) => {
+  if (!url) return "";
+  const [path, query] = url.split("?");
+  let resolvedPath = path;
+  Object.entries(params).forEach(([key, value]) => {
+    resolvedPath = resolvedPath.replace(new RegExp(`:${key}\\b`, "g"), value);
+  });
+  if (!query) return resolvedPath;
+  const displayQuery = query.replace(/:([\w]+)\b/g, (_, key: string) => params[key] || "[]");
+  return `${resolvedPath}?${displayQuery}`;
 };
 
 export const getCheckoutFieldHint = (field: string) => {

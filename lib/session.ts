@@ -14,7 +14,6 @@ export const sessionOptions: SessionOptions = {
   cookieName: "rzp-tool-session",
   cookieOptions: {
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 4,
   },
 };
 

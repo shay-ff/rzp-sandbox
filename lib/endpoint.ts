@@ -4,6 +4,7 @@ export interface Endpoint {
     method: string;
     url: string | null;
     params?: string[];
+    defaultParams?: Record<string, string>;
     defaultBody?: Record<string, any>;
     checkoutFields?: string[];
     variants?: { label: string; key: string }[];
@@ -83,25 +84,29 @@ export const endpointGroups: EndpointGroup[] = [
                 id: "fetch_payment_with_card",
                 label: "Fetch Payment with Card Details",
                 method: "GET",
-                url: "https://api.razorpay.com/v1/payments/pay_DG4a4vAWvKrh79/?expand[]=card",
+                url: "https://api.razorpay.com/v1/payments/:payment_id/?expand[]=card",
+                params: ["payment_id"],
             },
             {
                 id: "fetch_payment_with_emi",
                 label: "Fetch Payment with EMI Details",
                 method: "GET",
-                url: "https://api.razorpay.com/v1/payments/pay_DG4ZdRK8ZnXC3k/?expand[]=emi",
+                url: "https://api.razorpay.com/v1/payments/:payment_id/?expand[]=emi",
+                params: ["payment_id"],
             },
             {
                 id: "fetch_payment_with_offers",
                 label: "Fetch Payment with Offers",
                 method: "GET",
-                url: "https://api.razorpay.com/v1/payments/pay_Exez1iJzI3hqR5/?expand[]=offers",
+                url: "https://api.razorpay.com/v1/payments/:payment_id/?expand[]=offers",
+                params: ["payment_id"],
             },
             {
                 id: "fetch_all_payments_with_filters",
                 label: "Fetch All Payments with Filters",
                 method: "GET",
-                url: "https://api.razorpay.com/v1/payments?from=1593320020&to=1624856020&count=2&skip=1",
+                url: "https://api.razorpay.com/v1/payments?from=:from&to=:to&count=:count&skip=:skip",
+                params: ["from", "to", "count", "skip"],
             },
             {
                 id: "fetch_all_payments_with_card",
@@ -113,13 +118,15 @@ export const endpointGroups: EndpointGroup[] = [
                 id: "fetch_order_payments",
                 label: "Fetch Payments for Order",
                 method: "GET",
-                url: "https://api.razorpay.com/v1/orders/order_DovFx48wjYEr2I/payments",
+                url: "https://api.razorpay.com/v1/orders/:order_id/payments",
+                params: ["order_id"],
             },
             {
                 id: "fetch_payment_card",
                 label: "Fetch Payment Card Details",
                 method: "GET",
-                url: "https://api.razorpay.com/v1/payments/pay_DtFYPi3IfUTgsL/card",
+                url: "https://api.razorpay.com/v1/payments/:payment_id/card",
+                params: ["payment_id"],
             },
         ],
     },
@@ -581,6 +588,7 @@ export const endpointGroups: EndpointGroup[] = [
                 method: "GET",
                 url: "https://api.razorpay.com/v1/payments/:payment_id",
                 params: ["payment_id"],
+                defaultParams: { payment_id: "pay_DG4a4vAWvKrh79" },
             },
             {
                 id: "caw_fetch_token_by_customer_id",
@@ -588,6 +596,7 @@ export const endpointGroups: EndpointGroup[] = [
                 method: "GET",
                 url: "https://api.razorpay.com/v1/customers/:customer_id/tokens",
                 params: ["customer_id"],
+                defaultParams: { customer_id: "cust_1Aa00000000001" },
             },
             {
                 id: "caw_create_mandate_order",
