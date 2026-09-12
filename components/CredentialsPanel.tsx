@@ -1,7 +1,7 @@
 "use client";
 
 import { useApp } from "@/context/AppContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface CredentialsPanelProps {
   onKeyIdChange?: (id: string) => void;
@@ -9,6 +9,7 @@ interface CredentialsPanelProps {
 
 export function CredentialsPanel({ onKeyIdChange }: CredentialsPanelProps) {
   const { credentials, endpointState } = useApp();
+  const [copyStatus, setCopyStatus] = useState("");
 
   useEffect(() => {
     if (onKeyIdChange) onKeyIdChange(credentials.keyId);
@@ -21,6 +22,16 @@ export function CredentialsPanel({ onKeyIdChange }: CredentialsPanelProps) {
       caw_checkout: { ...(p.caw_checkout || {}), key: credentials.keyId },
     }));
   }, [credentials.keyId]);
+
+  const copyCredentials = async () => {
+    try {
+      await navigator.clipboard.writeText(`${credentials.keyId}:${credentials.keySecret}`);
+      setCopyStatus("copied");
+      setTimeout(() => setCopyStatus(""), 2000);
+    } catch {
+      setCopyStatus("error");
+    }
+  };
 
   return (
     <div className="px-4 py-4 border-b border-border space-y-2">
@@ -66,6 +77,14 @@ export function CredentialsPanel({ onKeyIdChange }: CredentialsPanelProps) {
         </button>
       </div>
       {credentials.credError && <p className="text-[10px] text-error mt-1">{credentials.credError}</p>}
+      {credentials.credsSaved && (
+        <button
+          onClick={copyCredentials}
+          className="w-full py-1.5 rounded-md text-xs font-semibold tracking-wide transition-all bg-surface border border-border text-text-high hover:bg-surface-hover"
+        >
+          {copyStatus === "copied" ? "copied" : copyStatus === "error" ? "copy failed" : "copy credentials"}
+        </button>
+      )}
     </div>
   );
 }

@@ -72,6 +72,27 @@ export default function GroupPage() {
           <section>
             <GroupHeader group={group.group} numbered={group.numbered} />
 
+            {filteredEndpoints.length > 0 && (
+              <nav
+                aria-label={`${group.group} endpoints`}
+                className="mb-5 rounded-lg border border-border bg-surface p-3"
+              >
+                <p className="text-[10px] text-text-low tracking-widest uppercase mb-2">Jump to endpoint</p>
+                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                  {filteredEndpoints.map((endpoint) => (
+                    <a
+                      key={endpoint.id}
+                      href={`#${endpoint.id}`}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-text-medium hover:bg-surface-hover hover:text-text-high transition-colors"
+                    >
+                      <span className="w-8 shrink-0 text-[10px] font-bold text-success">{endpoint.method}</span>
+                      <span className="truncate">{endpoint.label}</span>
+                    </a>
+                  ))}
+                </div>
+              </nav>
+            )}
+
             <div className="space-y-4">
               {filteredEndpoints.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border bg-surface p-8 text-center text-xs text-text-medium">
