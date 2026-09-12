@@ -1,17 +1,45 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { useState } from "react";
 import { useApp } from "@/context/AppContext";
 import type { Endpoint } from "@/lib/endpoint";
 import {
   isEndpointBodyDirty,
   getCheckoutFieldHint,
-  getResponseCopyText,
   getResponseSummaryText,
   getResponsePreviewText,
   getResponseRawCopyText,
   resolveUrl,
 } from "@/lib/utils/helpers";
 import { MethodBadge } from "./MethodBadge";
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+
+const URL_PATTERN = /(https?:\/\/[^\s"'<>]+)/g;
+const isUrlPart = (part: string) => /^https?:\/\/[^\s"'<>]+$/.test(part);
+
+function LinkifiedText({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(URL_PATTERN).map((part, index) =>
+        isUrlPart(part) ? (
+          <a
+            key={`${part}-${index}`}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline underline-offset-2 hover:text-primary-hover"
+          >
+            {part}
+          </a>
+        ) : (
+          <span key={`${part}-${index}`}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
 
 interface EndpointCardProps {
   endpoint: Endpoint;
@@ -44,6 +72,7 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
 
   const ep = endpoint;
   const isCheckout = ep.method === "CHECKOUT";
+  const [expandedPanel, setExpandedPanel] = useState<"request" | "response" | null>(null);
 
   const copyToClipboard = async (text: string, key: string) => {
     try {
@@ -180,7 +209,7 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                     setSelectedVariants((p) => ({ ...p, [ep.id]: key }));
                     setBodyValues((p) => ({
                       ...p,
-                      [ep.id]: JSON.stringify((ep.defaultBody as Record<string, any>)[key], null, 2),
+                      [ep.id]: JSON.stringify((ep.defaultBody as Record<string, unknown>)[key], null, 2),
                     }));
                   }}
                   className="bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high outline-none focus:border-primary transition-colors font-mono w-full"
@@ -199,26 +228,42 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                     modified from default
                   </div>
                 )}
-                <textarea
-                  rows={Object.keys(ep.defaultBody || {}).length + 3}
-                  value={bodyValues[ep.id] || ""}
-                  onChange={(e) => setBodyValues((p) => ({ ...p, [ep.id]: e.target.value }))}
-                  className={`w-full bg-bg border rounded-md px-3 py-2 text-xs text-text-high outline-none transition-colors font-mono resize-none ${
-                    bodyErrors[ep.id]
-                      ? "border-error focus:border-error"
-                      : isEndpointBodyDirty(ep, bodyValues, selectedVariants)
-                        ? "border-amber/40 focus:border-amber"
-                        : "border-border focus:border-primary"
-                  }`}
-                  onBlur={(e) => {
-                    try {
-                      JSON.parse(e.target.value);
-                      setBodyErrors((p) => ({ ...p, [ep.id]: false }));
-                    } catch {
-                      setBodyErrors((p) => ({ ...p, [ep.id]: true }));
-                    }
-                  }}
-                />
+                <div className={`overflow-hidden rounded-md border ${
+                  bodyErrors[ep.id]
+                    ? "border-error"
+                    : isEndpointBodyDirty(ep, bodyValues, selectedVariants)
+                      ? "border-amber/40"
+                      : "border-border"
+                }`}>
+                  <div className="flex items-center justify-between border-b border-border bg-surface px-3 py-1.5">
+                    <span className="text-[10px] text-text-low">JSON</span>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedPanel("request")}
+                      className="text-[10px] font-semibold text-text-medium hover:text-text-high transition-colors"
+                    >
+                      Expand editor
+                    </button>
+                  </div>
+                  <MonacoEditor
+                    height={`${Math.max(130, Math.min(280, (Object.keys(ep.defaultBody || {}).length + 3) * 22))}px`}
+                    language="json"
+                    theme="vs-dark"
+                    value={bodyValues[ep.id] || ""}
+                    onChange={(value) => setBodyValues((p) => ({ ...p, [ep.id]: value || "" }))}
+                    onValidate={(markers) => setBodyErrors((p) => ({ ...p, [ep.id]: markers.length > 0 }))}
+                    options={{
+                      automaticLayout: true,
+                      minimap: { enabled: false },
+                      fontSize: 12,
+                      lineNumbers: "on",
+                      scrollBeyondLastLine: false,
+                      wordWrap: "on",
+                      links: true,
+                      padding: { top: 8, bottom: 8 },
+                    }}
+                  />
+                </div>
                 {bodyErrors[ep.id] && <p className="text-[10px] text-error mt-1">invalid JSON</p>}
               </div>
             )}
@@ -306,6 +351,12 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                     </>
                   )}
                   <button
+                    onClick={() => setExpandedPanel("response")}
+                    className="ml-auto text-[10px] text-text-medium hover:text-text-high transition-colors"
+                  >
+                    Expand
+                  </button>
+                  <button
                     onClick={() => handler.setResponses((p) => ({ ...p, [ep.id]: null }))}
                     className="ml-auto text-[10px] text-text-medium hover:text-text-high transition-colors"
                   >
@@ -327,13 +378,62 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                   <p className="text-[10px] text-text-medium mb-2">{responses[ep.id].contentType}</p>
                 )}
                 <pre className="bg-bg border border-border rounded-md p-4 text-[11px] text-text-medium overflow-x-auto whitespace-pre-wrap leading-relaxed">
-                  {getResponsePreviewText(responses[ep.id])}
+                  <LinkifiedText text={getResponsePreviewText(responses[ep.id])} />
                 </pre>
               </div>
             )}
           </>
         )}
       </div>
+
+      {expandedPanel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6">
+          <div className="flex h-[min(88vh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div>
+                <p className="text-xs font-semibold text-text-high">
+                  {expandedPanel === "request" ? "Request body" : "Response"}
+                </p>
+                <p className="text-[10px] text-text-low">{ep.label}</p>
+              </div>
+              <button
+                type="button"
+                aria-label="Close expanded view"
+                onClick={() => setExpandedPanel(null)}
+                className="flex h-7 w-7 items-center justify-center rounded-md border border-border text-text-medium hover:bg-surface-hover hover:text-text-high"
+              >
+                ×
+              </button>
+            </div>
+            <div className="min-h-0 flex-1">
+              {expandedPanel === "request" ? (
+                <MonacoEditor
+                  height="100%"
+                  language="json"
+                  theme="vs-dark"
+                  value={bodyValues[ep.id] || ""}
+                  onChange={(value) => setBodyValues((p) => ({ ...p, [ep.id]: value || "" }))}
+                  onValidate={(markers) => setBodyErrors((p) => ({ ...p, [ep.id]: markers.length > 0 }))}
+                  options={{
+                    automaticLayout: true,
+                    minimap: { enabled: true },
+                    fontSize: 13,
+                    lineNumbers: "on",
+                    scrollBeyondLastLine: false,
+                    wordWrap: "on",
+                    links: true,
+                    padding: { top: 16, bottom: 16 },
+                  }}
+                />
+              ) : (
+                <pre className="h-full overflow-auto bg-bg p-4 text-xs leading-relaxed text-text-medium whitespace-pre-wrap">
+                  <LinkifiedText text={getResponsePreviewText(responses[ep.id])} />
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
