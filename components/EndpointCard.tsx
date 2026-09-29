@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useState } from "react";
 import { useApp } from "@/context/AppContext";
+import { useTheme } from "@/context/ThemeContext";
 import type { Endpoint } from "@/lib/endpoint";
 import {
   isEndpointBodyDirty,
@@ -69,6 +70,7 @@ interface EndpointCardProps {
 
 export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
   const { credentials, endpointState, handler } = useApp();
+  const { mode } = useTheme();
   const {
     bodyValues,
     setBodyValues,
@@ -78,6 +80,8 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
     setCheckoutValues,
     urlParamValues,
     setUrlParamValues,
+    headerValues,
+    setHeaderValues,
     selectedVariants,
     setSelectedVariants,
     bodyErrors,
@@ -246,6 +250,27 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
               </div>
             )}
 
+            {ep.headers && Object.keys(ep.headers).map((headerName) => (
+              <div key={headerName}>
+                <label className="text-[10px] text-text-medium tracking-widest uppercase block mb-1.5">
+                  {headerName}
+                </label>
+                <input
+                  value={headerValues[ep.id]?.[headerName] || ""}
+                  onChange={(event) =>
+                    setHeaderValues((previous) => ({
+                      ...previous,
+                      [ep.id]: {
+                        ...previous[ep.id],
+                        [headerName]: event.target.value,
+                      },
+                    }))
+                  }
+                  className="w-full bg-bg border border-border rounded-md px-3 py-2 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors font-mono"
+                />
+              </div>
+            ))}
+
             {(ep.defaultBody || (ep.method === "POST" && !ep.hideBody)) && (
               <div>
                 {isEndpointBodyDirty(ep, bodyValues, selectedVariants) && (
@@ -273,7 +298,7 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                   <MonacoEditor
                     height={`${Math.max(130, Math.min(280, (Object.keys(ep.defaultBody || {}).length + 3) * 22))}px`}
                     language="json"
-                    theme="vs-dark"
+                    theme={mode === "light" ? "vs" : "vs-dark"}
                     value={bodyValues[ep.id] || ""}
                     onChange={(value) => setBodyValues((p) => ({ ...p, [ep.id]: value || "" }))}
                     onValidate={(markers) => setBodyErrors((p) => ({ ...p, [ep.id]: markers.length > 0 }))}
@@ -435,7 +460,7 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                 <MonacoEditor
                   height="100%"
                   language="json"
-                  theme="vs-dark"
+                  theme={mode === "light" ? "vs" : "vs-dark"}
                   value={bodyValues[ep.id] || ""}
                   onChange={(value) => setBodyValues((p) => ({ ...p, [ep.id]: value || "" }))}
                   onValidate={(markers) => setBodyErrors((p) => ({ ...p, [ep.id]: markers.length > 0 }))}

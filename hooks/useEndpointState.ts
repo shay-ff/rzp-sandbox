@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { endpointGroups } from "@/lib/endpoint";
 
 function buildEndpointState() {
@@ -8,6 +8,7 @@ function buildEndpointState() {
   const urls: Record<string, string> = {};
   const checkoutValues: Record<string, Record<string, string>> = {};
   const urlParamValues: Record<string, Record<string, string>> = {};
+  const headerValues: Record<string, Record<string, string>> = {};
 
   endpointGroups.forEach((group) => {
     group.endpoints.forEach((endpoint) => {
@@ -24,6 +25,7 @@ function buildEndpointState() {
         }
       }
       if (endpoint.url) urls[endpoint.id] = endpoint.url;
+      if (endpoint.headers) headerValues[endpoint.id] = { ...endpoint.headers };
       if (endpoint.checkoutFields) {
         checkoutValues[endpoint.id] = endpoint.checkoutFields.reduce<Record<string, string>>((acc, field) => {
           acc[field] = "";
@@ -39,24 +41,19 @@ function buildEndpointState() {
     });
   });
 
-  return { bodies, urls, checkoutValues, urlParamValues };
+  return { bodies, urls, checkoutValues, urlParamValues, headerValues };
 }
 
+const initialEndpointState = buildEndpointState();
+
 export function useEndpointState() {
-  const [bodyValues, setBodyValues] = useState<Record<string, string>>({});
-  const [urlValues, setUrlValues] = useState<Record<string, string>>({});
-  const [checkoutValues, setCheckoutValues] = useState<Record<string, Record<string, string>>>({});
-  const [urlParamValues, setUrlParamValues] = useState<Record<string, Record<string, string>>>({});
+  const [bodyValues, setBodyValues] = useState<Record<string, string>>(initialEndpointState.bodies);
+  const [urlValues, setUrlValues] = useState<Record<string, string>>(initialEndpointState.urls);
+  const [checkoutValues, setCheckoutValues] = useState<Record<string, Record<string, string>>>(initialEndpointState.checkoutValues);
+  const [urlParamValues, setUrlParamValues] = useState<Record<string, Record<string, string>>>(initialEndpointState.urlParamValues);
+  const [headerValues, setHeaderValues] = useState<Record<string, Record<string, string>>>(initialEndpointState.headerValues);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [bodyErrors, setBodyErrors] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    const { bodies, urls, checkoutValues, urlParamValues } = buildEndpointState();
-    setBodyValues(bodies);
-    setUrlValues(urls);
-    setCheckoutValues(checkoutValues);
-    setUrlParamValues(urlParamValues);
-  }, []);
 
   return {
     bodyValues,
@@ -67,6 +64,8 @@ export function useEndpointState() {
     setCheckoutValues,
     urlParamValues,
     setUrlParamValues,
+    headerValues,
+    setHeaderValues,
     selectedVariants,
     setSelectedVariants,
     bodyErrors,

@@ -21,6 +21,7 @@ export function useRequestHandler(
   urlValues: Record<string, string>,
   urlParamValues: Record<string, Record<string, string>>,
   selectedVariants: Record<string, string>,
+  headerValues: Record<string, Record<string, string>>,
   saveRequestHistory: (entry: RequestHistoryEntry) => Promise<void>
 ) {
   const [responses, setResponses] = useState<Record<string, any>>({});
@@ -65,6 +66,7 @@ export function useRequestHandler(
       setResponseViewMode((p) => ({ ...p, [ep.id]: "json" }));
 
       const requestBodyText = bodyValues[ep.id] || "";
+      const requestHeaders = headerValues[ep.id] || ep.headers || {};
 
       try {
         let body = null;
@@ -77,7 +79,7 @@ export function useRequestHandler(
         const res = await fetch("/api/rzp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ method: ep.method, url, body }),
+          body: JSON.stringify({ method: ep.method, url, body, headers: requestHeaders }),
         });
 
         const data = await res.json();
@@ -133,7 +135,7 @@ export function useRequestHandler(
         setLoading((p) => ({ ...p, [ep.id]: false }));
       }
     },
-    [bodyValues, urlValues, urlParamValues, selectedVariants, saveRequestHistory, clearCopyStatus]
+    [bodyValues, urlValues, urlParamValues, selectedVariants, headerValues, saveRequestHistory, clearCopyStatus]
   );
 
   const buildCurlCommand = useCallback(
@@ -147,6 +149,9 @@ export function useRequestHandler(
       if (keyId || keySecret) {
         parts.push("-u", shellEscape(`${keyId}:${keySecret}`));
       }
+      Object.entries(headerValues[ep.id] || ep.headers || {}).forEach(([name, value]) => {
+        parts.push("-H", shellEscape(`${name}: ${value}`));
+      });
       const rawBody = (bodyValues[ep.id] || "").trim();
       if (rawBody) {
         const parsedBody = JSON.parse(rawBody);
@@ -155,7 +160,7 @@ export function useRequestHandler(
       }
       return parts.join(" ");
     },
-    [keyId, keySecret, bodyValues, urlValues, urlParamValues]
+    [keyId, keySecret, bodyValues, urlValues, urlParamValues, headerValues]
   );
 
   const copyCurl = useCallback(

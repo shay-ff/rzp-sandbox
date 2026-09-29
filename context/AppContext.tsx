@@ -17,6 +17,7 @@ function useAppState() {
     endpointState.urlValues,
     endpointState.urlParamValues,
     endpointState.selectedVariants,
+    endpointState.headerValues,
     history.saveRequestHistory
   );
 

@@ -6,6 +6,7 @@ export interface Endpoint {
     params?: string[];
     defaultParams?: Record<string, string>;
     defaultBody?: Record<string, any>;
+    headers?: Record<string, string>;
     checkoutFields?: string[];
     variants?: { label: string; key: string }[];
     hideBody?: boolean;
@@ -687,6 +688,67 @@ export const endpointGroups: EndpointGroup[] = [
                     legal_info: {
                         pan: "AAACL1234C",
                         gst: "18AABCU9603R1ZM"
+                    }
+                }
+            },
+            {
+                id: "route_activation_complete",
+                label: "Route Activation (Composite)",
+                method: "POST",
+                url: "https://api.razorpay.com/v2/accounts",
+                headers: {
+                    "Idempotency-Key": "7a3e1f9c-22ab-4d11-8e9a-3c8b91d6f201"
+                },
+                variants: [
+                    { label: "UPI", key: "upi" },
+                    { label: "Bank Account", key: "bank_account" }
+                ],
+                defaultBody: {
+                    upi: {
+                        type: "route",
+                        tnc_accepted: true,
+                        reference_id: "Vendor_lvr_88421",
+                        legal_business_name: "Ravi Kumar",
+                        business_type: "individual",
+                        email: "ravi.kumar@example.com",
+                        phone: "+919876543210",
+                        legal_info: { pan: "AAACL1234C" },
+                        notes: { property_id: "BLR_HSR_42B", city: "Bengaluru" },
+                        settlement_accounts: [
+                            {
+                                method: "upi",
+                                upi: {
+                                    vpa: "ravi.kumar@okhdfcbank",
+                                    beneficiary_name: "Ravi Kumar",
+                                    currency: "INR",
+                                    is_default: true
+                                }
+                            }
+                        ]
+                    },
+                    bank_account: {
+                        type: "route",
+                        tnc_accepted: true,
+                        reference_id: "Vendor_lvr_88422",
+                        legal_business_name: "Priya Sharma",
+                        business_type: "individual",
+                        email: "priya@example.com",
+                        phone: "+919812345678",
+                        legal_info: { pan: "BCEDP5678Q" },
+                        notes: { property_id: "BLR_KOR_17A", city: "Bengaluru" },
+                        settlement_accounts: [
+                            {
+                                method: "bank_account",
+                                bank_account: {
+                                    account_number: "1234567890123456",
+                                    beneficiary_name: "Priya Sharma",
+                                    code_type: "ifsc",
+                                    code: "HDFC0000317",
+                                    currency: "INR",
+                                    is_default: true
+                                }
+                            }
+                        ]
                     }
                 }
             },

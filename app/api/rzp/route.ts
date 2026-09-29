@@ -14,13 +14,14 @@ export async function POST(req : Request) {
     key_secret: session.keySecret,
   });
 
-  const { method, url, body } = await req.json();
+  const { method, url, body, headers: requestHeaders } = await req.json();
 
   try {
     const response = await fetch(url, {
       method,
       headers: {
         "Content-Type": "application/json",
+        ...requestHeaders,
         Authorization:
           "Basic " +
           Buffer.from(`${session.keyId}:${session.keySecret}`).toString("base64"),
