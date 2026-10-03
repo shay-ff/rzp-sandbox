@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import Script from "next/script";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { ClientProviders } from "@/components/ClientProviders";
@@ -32,7 +31,6 @@ export default function RootLayout({
           {children}
         </ClientProviders>
         <Analytics />
-        <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="beforeInteractive" />
       </body>
     </html>
   );

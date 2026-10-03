@@ -8,20 +8,12 @@ interface CredentialsPanelProps {
 }
 
 export function CredentialsPanel({ onKeyIdChange }: CredentialsPanelProps) {
-  const { credentials, endpointState } = useApp();
+  const { credentials } = useApp();
   const [copyStatus, setCopyStatus] = useState("");
 
   useEffect(() => {
     if (onKeyIdChange) onKeyIdChange(credentials.keyId);
   }, [credentials.keyId, onKeyIdChange]);
-
-  useEffect(() => {
-    if (!credentials.keyId) return;
-    endpointState.setCheckoutValues((p) => ({
-      ...p,
-      caw_checkout: { ...(p.caw_checkout || {}), key: credentials.keyId },
-    }));
-  }, [credentials.keyId]);
 
   const copyCredentials = async () => {
     try {

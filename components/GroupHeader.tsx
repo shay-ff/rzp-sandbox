@@ -7,10 +7,10 @@ interface GroupHeaderProps {
 
 export function GroupHeader({ group, numbered }: GroupHeaderProps) {
   return (
-    <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
-      <h2 className="text-xs tracking-widest text-text-medium uppercase">{group}</h2>
+    <div className="mb-4 flex items-center gap-2 sm:mb-5 sm:gap-3">
+      <h2 className="text-sm font-semibold tracking-tight text-text-high">{group}</h2>
       {numbered && (
-        <span className="text-[10px] bg-primary-bg border border-primary/30 text-primary px-2 py-0.5 rounded-full">
+        <span className="rounded-full border border-primary/30 bg-primary-bg px-2 py-0.5 text-[10px] font-medium text-primary">
           sequential flow
         </span>
       )}

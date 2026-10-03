@@ -13,11 +13,11 @@ const NavSection = memo(function NavSection() {
   const pathname = usePathname();
 
   return (
-    <nav className="px-4 py-4 space-y-1">
-      <p className="text-[10px] text-text-low tracking-widest uppercase mb-2 px-2">Tools</p>
+    <nav className="space-y-1 px-3 py-4">
+      <p className="mb-2 px-2 text-[10px] uppercase tracking-widest text-text-low">Tools</p>
       <Link
         href="/checkout"
-        className={`block w-full text-left text-xs py-2 px-2 rounded-md transition-colors ${
+        className={`block w-full rounded-lg px-3 py-2 text-left text-xs transition-colors ${
           pathname === "/checkout"
             ? "bg-primary-bg text-primary font-medium"
             : "text-text-medium hover:text-text-high hover:bg-surface-hover"
@@ -32,7 +32,7 @@ const NavSection = memo(function NavSection() {
           Checkout Builder
         </span>
       </Link>
-      <p className="text-[10px] text-text-low tracking-widest uppercase mt-4 mb-2 px-2">Endpoints</p>
+      <p className="mb-2 mt-5 px-2 text-[10px] uppercase tracking-widest text-text-low">Endpoints</p>
       {endpointGroups.map((g) => {
         const slug = groupSlugMap[g.group];
         const href = `/${slug}`;
@@ -41,7 +41,7 @@ const NavSection = memo(function NavSection() {
           <Link
             key={g.group}
             href={href}
-            className={`block w-full text-left text-xs py-2 px-2 rounded-md transition-colors ${
+            className={`block w-full rounded-lg px-3 py-2 text-left text-xs transition-colors ${
               isActive
                 ? "bg-primary-bg text-primary font-medium"
                 : "text-text-medium hover:text-text-high hover:bg-surface-hover"
@@ -61,7 +61,7 @@ const NavSection = memo(function NavSection() {
 export function Sidebar() {
   return (
     <aside className="w-full border-b border-border bg-surface flex flex-col shrink-0 lg:w-56 lg:border-b-0 lg:border-r lg:sticky lg:top-0 lg:h-screen overflow-y-auto">
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div className="flex items-center gap-2">
           <div className="relative h-6 w-6 shrink-0 overflow-hidden rounded-md bg-bg border border-border">
             <Image
@@ -73,7 +73,7 @@ export function Sidebar() {
               priority
             />
           </div>
-          <span className="text-sm font-semibold text-primary tracking-wide">RZP Sandbox</span>
+          <span className="text-sm font-semibold tracking-wide text-text-high">RZP <span className="text-primary">Sandbox</span></span>
         </div>
         <ThemeToggle />
       </div>

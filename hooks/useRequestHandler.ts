@@ -13,6 +13,7 @@ import {
   resolveUrl,
 } from "@/lib/utils/helpers";
 import { endpointMetaById } from "@/lib/utils/endpointMeta";
+import { loadRazorpay } from "@/lib/utils/loadRazorpay";
 
 export function useRequestHandler(
   keyId: string,
@@ -62,7 +63,6 @@ export function useRequestHandler(
       const requestStartedTime = performance.now();
       clearCopyStatus(ep.id);
       setLoading((p) => ({ ...p, [ep.id]: true }));
-      setResponses((p) => ({ ...p, [ep.id]: null }));
       setResponseViewMode((p) => ({ ...p, [ep.id]: "json" }));
 
       const requestBodyText = bodyValues[ep.id] || "";
@@ -84,6 +84,7 @@ export function useRequestHandler(
 
         const data = await res.json();
         setResponses((p) => ({ ...p, [ep.id]: data }));
+        setLoading((p) => ({ ...p, [ep.id]: false }));
         if (data && data.isJson === false) {
           setResponseViewMode((p) => ({ ...p, [ep.id]: "raw" }));
         }
@@ -108,13 +109,14 @@ export function useRequestHandler(
           variantKey: selectedVariants[ep.id],
         };
 
-        await saveRequestHistory(historyEntry);
+        void saveRequestHistory(historyEntry);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Request failed";
         setResponses((p) => ({ ...p, [ep.id]: { error: message } }));
+        setLoading((p) => ({ ...p, [ep.id]: false }));
         const errorUrl = resolveUrl(urlValues[ep.id] || ep.url || "", urlParamValues[ep.id] || {});
         const completedAt = new Date().toISOString();
-        await saveRequestHistory({
+        void saveRequestHistory({
           id: createHistoryId(),
           endpointId: ep.id,
           endpointLabel: ep.label,
@@ -185,7 +187,15 @@ export function useRequestHandler(
   );
 
   const openCheckout = useCallback(
-    (ep: Endpoint, checkoutValues: Record<string, Record<string, string>>) => {
+    async (ep: Endpoint, checkoutValues: Record<string, Record<string, string>>) => {
+      try {
+        await loadRazorpay();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to load Razorpay Checkout";
+        alert(message);
+        return;
+      }
+
       const vals = checkoutValues[ep.id] || {};
       const options = {
         key: keyId || "",

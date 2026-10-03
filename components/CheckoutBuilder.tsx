@@ -15,6 +15,7 @@ import {
   buildCheckoutOptions,
 } from "@/lib/checkoutConfig";
 import { CheckoutCodePreview } from "./CheckoutCodePreview";
+import { loadRazorpay } from "@/lib/utils/loadRazorpay";
 
 interface DragState {
   draggedId: string | null;
@@ -128,13 +129,14 @@ export function CheckoutBuilder() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const testCheckout = () => {
+  const testCheckout = async () => {
     if (!options.key) {
       setTestResult("Error: Key is required to test checkout.");
       setShowTestModal(true);
       return;
     }
     try {
+      await loadRazorpay();
       const rzp = new (window as any).Razorpay({
         ...generatedOptions,
         modal: {

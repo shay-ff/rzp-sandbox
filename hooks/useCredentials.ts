@@ -18,7 +18,8 @@ export function useCredentials() {
           setCredsSaved(true);
         }
         if (data.keySecret) setKeySecret(data.keySecret);
-      });
+      })
+      .catch(() => {});
   }, []);
 
   const saveCredentials = useCallback(async () => {

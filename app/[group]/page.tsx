@@ -62,7 +62,7 @@ export default function GroupPage() {
     <div className="min-h-screen bg-bg text-text-medium font-sans flex flex-col lg:flex-row">
       <Sidebar />
       <main className="flex-1 overflow-visible lg:overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 space-y-12 sm:space-y-16">
+        <div className="mx-auto max-w-4xl space-y-10 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
           <FilterBar
             search={endpointSearch}
             setSearch={setEndpointSearch}
@@ -71,12 +71,25 @@ export default function GroupPage() {
           />
 
           <section>
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <p className="mb-1 text-[10px] uppercase tracking-[0.2em] text-text-low">API reference</p>
+                <p className="text-xs text-text-medium">
+                  {filteredEndpoints.length} of {group.endpoints.length} endpoints
+                </p>
+              </div>
+              {endpointSearch || endpointMethodFilter !== "ALL" ? (
+                <span className="rounded-full border border-primary/20 bg-primary-bg px-2.5 py-1 text-[10px] font-medium text-primary">
+                  filtered
+                </span>
+              ) : null}
+            </div>
             <GroupHeader group={group.group} numbered={group.numbered} />
 
             {filteredEndpoints.length > 0 && (
               <nav
                 aria-label={`${group.group} endpoints`}
-                className="mb-5 rounded-lg border border-border bg-surface p-3"
+                className="mb-5 rounded-xl border border-border bg-surface p-3 shadow-sm shadow-black/5"
               >
                 <p className="text-[10px] text-text-low tracking-widest uppercase mb-2">Jump to endpoint</p>
                 <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">

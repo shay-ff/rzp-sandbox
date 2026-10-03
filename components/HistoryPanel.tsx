@@ -65,7 +65,8 @@ export function HistoryPanel() {
     <div className="fixed inset-x-3 bottom-3 z-50 sm:inset-x-auto sm:bottom-auto sm:top-4 sm:right-4">
       <button
         onClick={() => setHistoryOpen((p) => !p)}
-        className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-full border border-border bg-surface/90 px-4 py-2 text-xs font-semibold text-text-high shadow-lg shadow-black/10 backdrop-blur hover:border-primary/40 hover:text-text-high transition-colors"
+        aria-expanded={historyOpen}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-surface/95 px-4 py-2.5 text-xs font-semibold text-text-high shadow-lg shadow-black/10 backdrop-blur transition-colors hover:border-primary/40 hover:text-text-high sm:w-auto"
       >
         <span>History</span>
         <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] text-text-medium">{requestHistory.length}</span>

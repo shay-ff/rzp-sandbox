@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { useTheme } from "@/context/ThemeContext";
 import type { Endpoint } from "@/lib/endpoint";
@@ -16,7 +16,31 @@ import {
 } from "@/lib/utils/helpers";
 import { MethodBadge } from "./MethodBadge";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => <div className="p-4 text-xs text-text-low">Loading editor…</div>,
+});
+
+const MODAL_EDITOR_OPTIONS = {
+  automaticLayout: true,
+  minimap: { enabled: true },
+  fontSize: 13,
+  lineNumbers: "on",
+  scrollBeyondLastLine: false,
+  wordWrap: "on",
+  links: true,
+  padding: { top: 16, bottom: 16 },
+} as const;
+
+function getJsonError(text: string): string | null {
+  if (!text.trim()) return null;
+  try {
+    JSON.parse(text);
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Invalid JSON";
+  }
+}
 
 const URL_PATTERN = /(https?:\/\/[^\s"'<>]+)/g;
 const isUrlPart = (part: string) => /^https?:\/\/[^\s"'<>]+$/.test(part);
@@ -84,8 +108,6 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
     setHeaderValues,
     selectedVariants,
     setSelectedVariants,
-    bodyErrors,
-    setBodyErrors,
   } = endpointState;
 
   const {
@@ -97,6 +119,18 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
   const ep = endpoint;
   const isCheckout = ep.method === "CHECKOUT";
   const [expandedPanel, setExpandedPanel] = useState<"request" | "response" | null>(null);
+  const bodyText = bodyValues[ep.id] || "";
+  const bodyError = useMemo(() => getJsonError(bodyText), [bodyText]);
+  const bodyRows = Math.max(6, Math.min(14, bodyText.split("\n").length + 1));
+
+  useEffect(() => {
+    if (!expandedPanel) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setExpandedPanel(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expandedPanel]);
 
   const copyToClipboard = async (text: string, key: string) => {
     try {
@@ -117,9 +151,9 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
         event.preventDefault();
         if (!isCheckout && !loading[ep.id] && credentials.credsSaved) sendRequest(ep);
       }}
-      className="scroll-mt-24 border border-border rounded-lg bg-surface overflow-hidden"
+      className="scroll-mt-24 overflow-hidden rounded-xl border border-border bg-surface shadow-sm shadow-black/5 transition-shadow hover:shadow-md hover:shadow-black/5"
     >
-      <div className="px-4 sm:px-5 py-3 border-b border-border flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+      <div className="flex flex-col items-start gap-2 border-b border-border bg-surface/70 px-4 py-3 sm:flex-row sm:items-center sm:gap-3 sm:px-5">
         {numbered && (
           <span className="text-[10px] w-5 h-5 rounded-full border border-border flex items-center justify-center text-text-medium shrink-0">
             {index + 1}
@@ -129,7 +163,7 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
         <span className="text-xs text-text-high font-semibold">{ep.label}</span>
       </div>
 
-      <div className="p-5 space-y-4">
+      <div className="space-y-4 p-5">
         {isCheckout ? (
           <div className="space-y-3">
             <p className="text-[11px] text-text-medium">Fill fields then open Razorpay checkout</p>
@@ -279,7 +313,7 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                   </div>
                 )}
                 <div className={`overflow-hidden rounded-md border ${
-                  bodyErrors[ep.id]
+                  bodyError
                     ? "border-error"
                     : isEndpointBodyDirty(ep, bodyValues, selectedVariants)
                       ? "border-amber/40"
@@ -295,26 +329,16 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                       Expand editor
                     </button>
                   </div>
-                  <MonacoEditor
-                    height={`${Math.max(130, Math.min(280, (Object.keys(ep.defaultBody || {}).length + 3) * 22))}px`}
-                    language="json"
-                    theme={mode === "light" ? "vs" : "vs-dark"}
-                    value={bodyValues[ep.id] || ""}
-                    onChange={(value) => setBodyValues((p) => ({ ...p, [ep.id]: value || "" }))}
-                    onValidate={(markers) => setBodyErrors((p) => ({ ...p, [ep.id]: markers.length > 0 }))}
-                    options={{
-                      automaticLayout: true,
-                      minimap: { enabled: false },
-                      fontSize: 12,
-                      lineNumbers: "on",
-                      scrollBeyondLastLine: false,
-                      wordWrap: "on",
-                      links: true,
-                      padding: { top: 8, bottom: 8 },
-                    }}
+                  <textarea
+                    value={bodyText}
+                    onChange={(event) => setBodyValues((p) => ({ ...p, [ep.id]: event.target.value }))}
+                    spellCheck={false}
+                    rows={bodyRows}
+                    aria-invalid={Boolean(bodyError)}
+                    className="block w-full resize-y bg-bg px-3 py-2 font-mono text-xs leading-relaxed text-text-high outline-none"
                   />
                 </div>
-                {bodyErrors[ep.id] && <p className="text-[10px] text-error mt-1">invalid JSON</p>}
+                {bodyError && <p className="text-[10px] text-error mt-1">Invalid JSON: {bodyError}</p>}
               </div>
             )}
 
@@ -381,7 +405,7 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
             </div>
 
             {responses[ep.id] && (
-              <div className="mt-2">
+              <div className={`mt-2 transition-opacity ${loading[ep.id] ? "opacity-50" : ""}`}>
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                   <label className="text-[10px] text-text-medium tracking-widest uppercase">Response</label>
                   {responses[ep.id].isJson === false && (
@@ -437,7 +461,11 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
       </div>
 
       {expandedPanel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6">
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-6"
+        >
           <div className="flex h-[min(88vh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
@@ -463,17 +491,7 @@ export function EndpointCard({ endpoint, index, numbered }: EndpointCardProps) {
                   theme={mode === "light" ? "vs" : "vs-dark"}
                   value={bodyValues[ep.id] || ""}
                   onChange={(value) => setBodyValues((p) => ({ ...p, [ep.id]: value || "" }))}
-                  onValidate={(markers) => setBodyErrors((p) => ({ ...p, [ep.id]: markers.length > 0 }))}
-                  options={{
-                    automaticLayout: true,
-                    minimap: { enabled: true },
-                    fontSize: 13,
-                    lineNumbers: "on",
-                    scrollBeyondLastLine: false,
-                    wordWrap: "on",
-                    links: true,
-                    padding: { top: 16, bottom: 16 },
-                  }}
+                  options={MODAL_EDITOR_OPTIONS}
                 />
               ) : (
                 <pre className="h-full overflow-auto bg-bg p-4 text-xs leading-relaxed text-text-medium whitespace-pre-wrap">

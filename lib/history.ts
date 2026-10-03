@@ -17,5 +17,5 @@ export interface RequestHistoryEntry {
 }
 
 export const HISTORY_MAX_ITEMS = 20;
-export const HISTORY_RESPONSE_PREVIEW_LIMIT = 1800;
-export const HISTORY_RESPONSE_SUMMARY_LIMIT = 320;
+export const HISTORY_RESPONSE_PREVIEW_LIMIT = 500;
+export const HISTORY_RESPONSE_SUMMARY_LIMIT = 160;

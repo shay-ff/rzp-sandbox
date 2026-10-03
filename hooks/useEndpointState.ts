@@ -53,7 +53,6 @@ export function useEndpointState() {
   const [urlParamValues, setUrlParamValues] = useState<Record<string, Record<string, string>>>(initialEndpointState.urlParamValues);
   const [headerValues, setHeaderValues] = useState<Record<string, Record<string, string>>>(initialEndpointState.headerValues);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
-  const [bodyErrors, setBodyErrors] = useState<Record<string, boolean>>({});
 
   return {
     bodyValues,
@@ -68,7 +67,5 @@ export function useEndpointState() {
     setHeaderValues,
     selectedVariants,
     setSelectedVariants,
-    bodyErrors,
-    setBodyErrors,
   };
 }
