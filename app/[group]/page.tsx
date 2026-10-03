@@ -1,24 +1,48 @@
 "use client";
 
-import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { endpointGroups } from "@/lib/endpoint";
-import { getGroupBySlug } from "@/lib/utils/endpointMeta";
+import { getGroupBySlug, getGroupSlug } from "@/lib/utils/endpointMeta";
 import { Sidebar } from "@/components/Sidebar";
 import { GroupHeader } from "@/components/GroupHeader";
 import { EndpointCard } from "@/components/EndpointCard";
 import { FilterBar } from "@/components/FilterBar";
 import { HistoryPanel } from "@/components/HistoryPanel";
-import { METHOD_COLORS } from "@/lib/utils/helpers";
 import type { EndpointMethodFilter } from "@/lib/utils/constants";
+import { FlowToast } from "@/components/FlowToast";
 
 export default function GroupPage() {
   const params = useParams();
   const slug = params.group as string;
   const groupName = getGroupBySlug(slug);
+  const group = endpointGroups.find((g) => g.group === groupName);
+  const router = useRouter();
 
   const [endpointSearch, setEndpointSearch] = useState("");
   const [endpointMethodFilter, setEndpointMethodFilter] = useState<EndpointMethodFilter>("ALL");
+  const [expandedEndpointId, setExpandedEndpointId] = useState<string | null>(null);
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    const storedToast = window.sessionStorage.getItem("next-step-toast");
+    if (storedToast) {
+      try {
+        setToast(JSON.parse(storedToast).message || "");
+      } catch {
+        window.sessionStorage.removeItem("next-step-toast");
+      }
+      window.sessionStorage.removeItem("next-step-toast");
+    }
+    const nextEndpointId = window.sessionStorage.getItem("next-endpoint-id");
+    if (!nextEndpointId || !group) return;
+    if (group.endpoints.some((endpoint) => endpoint.id === nextEndpointId)) {
+      setEndpointSearch("");
+      setEndpointMethodFilter("ALL");
+      setExpandedEndpointId(nextEndpointId);
+      window.sessionStorage.removeItem("next-endpoint-id");
+    }
+  }, [group]);
 
   if (!groupName) {
     return (
@@ -36,7 +60,6 @@ export default function GroupPage() {
     );
   }
 
-  const group = endpointGroups.find((g) => g.group === groupName);
   if (!group) return null;
 
   const filteredEndpoints = group.endpoints.filter((endpoint) => {
@@ -60,6 +83,7 @@ export default function GroupPage() {
 
   return (
     <div className="min-h-screen bg-bg text-text-medium font-sans flex flex-col lg:flex-row">
+      {toast && <FlowToast message={toast} onClose={() => setToast("")} />}
       <Sidebar />
       <main className="flex-1 overflow-visible lg:overflow-y-auto">
         <div className="mx-auto max-w-4xl space-y-10 px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
@@ -86,34 +110,6 @@ export default function GroupPage() {
             </div>
             <GroupHeader group={group.group} numbered={group.numbered} />
 
-            {filteredEndpoints.length > 0 && (
-              <nav
-                aria-label={`${group.group} endpoints`}
-                className="mb-5 rounded-xl border border-border bg-surface p-3 shadow-sm shadow-black/5"
-              >
-                <p className="text-[10px] text-text-low tracking-widest uppercase mb-2">Jump to endpoint</p>
-                <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
-                  {filteredEndpoints.map((endpoint) => (
-                    <a
-                      key={endpoint.id}
-                      href={`#${endpoint.id}`}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-text-medium hover:bg-surface-hover hover:text-text-high transition-colors"
-                    >
-                      <span
-                        className={`inline-flex shrink-0 items-center justify-center rounded border px-1.5 py-0.5 text-[9px] font-bold ${
-                          METHOD_COLORS[endpoint.method as keyof typeof METHOD_COLORS] ||
-                          "text-text-medium bg-surface border-border"
-                        }`}
-                      >
-                        {endpoint.method}
-                      </span>
-                      <span className="truncate">{endpoint.label}</span>
-                    </a>
-                  ))}
-                </div>
-              </nav>
-            )}
-
             <div className="space-y-4">
               {filteredEndpoints.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border bg-surface p-8 text-center text-xs text-text-medium">
@@ -126,6 +122,25 @@ export default function GroupPage() {
                     endpoint={ep}
                     index={idx}
                     numbered={group.numbered}
+                    expanded={expandedEndpointId === ep.id}
+                    onToggle={() => setExpandedEndpointId((current) => current === ep.id ? null : ep.id)}
+                    onNextStep={(nextEndpoint, message) => {
+                      const nextGroup = endpointGroups.find((candidate) =>
+                        candidate.endpoints.some((candidateEndpoint) => candidateEndpoint.id === nextEndpoint.id)
+                      );
+                      if (!nextGroup) return;
+                      setExpandedEndpointId(null);
+                      setEndpointSearch("");
+                      setEndpointMethodFilter("ALL");
+                      if (nextGroup.group === group.group) {
+                        window.sessionStorage.removeItem("next-step-toast");
+                        setExpandedEndpointId(nextEndpoint.id);
+                        setToast(message);
+                      } else {
+                        window.sessionStorage.setItem("next-endpoint-id", nextEndpoint.id);
+                        router.push(`/${getGroupSlug(nextGroup.group)}`);
+                      }
+                    }}
                   />
                 ))
               )}

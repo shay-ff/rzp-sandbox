@@ -54,6 +54,19 @@ export function useEndpointState() {
   const [headerValues, setHeaderValues] = useState<Record<string, Record<string, string>>>(initialEndpointState.headerValues);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
 
+  const resetEndpoint = (endpointId: string) => {
+    setBodyValues((p) => ({ ...p, [endpointId]: initialEndpointState.bodies[endpointId] || "" }));
+    setUrlValues((p) => ({ ...p, [endpointId]: initialEndpointState.urls[endpointId] || "" }));
+    setCheckoutValues((p) => ({ ...p, [endpointId]: initialEndpointState.checkoutValues[endpointId] || {} }));
+    setUrlParamValues((p) => ({ ...p, [endpointId]: initialEndpointState.urlParamValues[endpointId] || {} }));
+    setHeaderValues((p) => ({ ...p, [endpointId]: initialEndpointState.headerValues[endpointId] || {} }));
+    setSelectedVariants((p) => {
+      const next = { ...p };
+      delete next[endpointId];
+      return next;
+    });
+  };
+
   return {
     bodyValues,
     setBodyValues,
@@ -67,5 +80,6 @@ export function useEndpointState() {
     setHeaderValues,
     selectedVariants,
     setSelectedVariants,
+    resetEndpoint,
   };
 }

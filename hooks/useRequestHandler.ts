@@ -46,6 +46,11 @@ export function useRequestHandler(
     });
   }, []);
 
+  const clearResponse = useCallback((epId: string) => {
+    setResponses((p) => ({ ...p, [epId]: null }));
+    setResponseViewMode((p) => ({ ...p, [epId]: "json" }));
+  }, []);
+
   const showCopied = useCallback((key: string, message: string = "copied") => {
     setCopyStatus((p) => ({ ...p, [key]: message }));
     setTimeout(() => {
@@ -83,7 +88,11 @@ export function useRequestHandler(
         });
 
         const data = await res.json();
-        setResponses((p) => ({ ...p, [ep.id]: data }));
+        const clientLatencyMs = Math.round(performance.now() - requestStartedTime);
+        setResponses((p) => ({
+          ...p,
+          [ep.id]: data && typeof data === "object" ? { ...data, clientLatencyMs } : data,
+        }));
         setLoading((p) => ({ ...p, [ep.id]: false }));
         if (data && data.isJson === false) {
           setResponseViewMode((p) => ({ ...p, [ep.id]: "raw" }));
@@ -231,6 +240,7 @@ export function useRequestHandler(
     copyStatus,
     showCopied,
     clearCopyStatus,
+    clearResponse,
     sendRequest,
     copyCurl,
     openCheckout,

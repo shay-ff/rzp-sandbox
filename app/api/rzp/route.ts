@@ -1,9 +1,10 @@
-import { getSession } from "../../../lib/session";
+import { expireCredentialsIfNeeded, getSession } from "../../../lib/session";
 import { NextResponse } from "next/server";
 import Razorpay from "razorpay";
 
 export async function POST(req : Request) {
   const session = await getSession() as any;
+  if (expireCredentialsIfNeeded(session)) await session.save();
 
   if (!session.keyId || !session.keySecret) {
     return NextResponse.json({ error: "No credentials in session" }, { status: 401 });

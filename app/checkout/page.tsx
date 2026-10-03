@@ -1,13 +1,32 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { CheckoutBuilder } from "@/components/CheckoutBuilder";
 import { HistoryPanel } from "@/components/HistoryPanel";
 import { Sidebar } from "@/components/Sidebar";
+import { FlowToast } from "@/components/FlowToast";
 
 export default function CheckoutPage() {
+  const [orderId, setOrderId] = useState("");
+  const [toast, setToast] = useState("");
+
+  useEffect(() => {
+    setOrderId(new URLSearchParams(window.location.search).get("order_id") || "");
+    const storedToast = window.sessionStorage.getItem("next-step-toast");
+    if (storedToast) {
+      try {
+        setToast(JSON.parse(storedToast).message || "");
+      } catch {
+        window.sessionStorage.removeItem("next-step-toast");
+      }
+      window.sessionStorage.removeItem("next-step-toast");
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-bg text-text-medium font-sans flex flex-col lg:flex-row">
+      {toast && <FlowToast message={toast} onClose={() => setToast("")} />}
       <Sidebar />
       <main className="flex-1 overflow-visible lg:overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 space-y-8">
@@ -54,7 +73,7 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          <CheckoutBuilder />
+          <CheckoutBuilder initialOrderId={orderId} />
         </div>
       </main>
       <HistoryPanel />

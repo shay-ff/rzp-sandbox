@@ -10,6 +10,7 @@ interface CredentialsPanelProps {
 export function CredentialsPanel({ onKeyIdChange }: CredentialsPanelProps) {
   const { credentials } = useApp();
   const [copyStatus, setCopyStatus] = useState("");
+  const [editingSecret, setEditingSecret] = useState(false);
 
   useEffect(() => {
     if (onKeyIdChange) onKeyIdChange(credentials.keyId);
@@ -17,7 +18,10 @@ export function CredentialsPanel({ onKeyIdChange }: CredentialsPanelProps) {
 
   const copyCredentials = async () => {
     try {
-      await navigator.clipboard.writeText(`${credentials.keyId}:${credentials.keySecret}`);
+      const response = await fetch("/api/session/credentials", { method: "POST" });
+      if (!response.ok) throw new Error("Credentials are not available");
+      const data = await response.json();
+      await navigator.clipboard.writeText(data.credentials);
       setCopyStatus("copied");
       setTimeout(() => setCopyStatus(""), 2000);
     } catch {
@@ -37,8 +41,16 @@ export function CredentialsPanel({ onKeyIdChange }: CredentialsPanelProps) {
       <input
         type={credentials.showSecret ? "text" : "password"}
         placeholder="Key Secret"
-        value={credentials.keySecret}
+        value={
+          editingSecret
+            ? credentials.keySecret
+            : credentials.keySecret || (credentials.hasStoredSecret ? "****************" : "")
+        }
         onChange={(e) => credentials.setKeySecret(e.target.value)}
+        onFocus={() => setEditingSecret(true)}
+        onBlur={() => {
+          if (!credentials.keySecret) setEditingSecret(false);
+        }}
         className="w-full bg-bg border border-border rounded-md px-3 py-1.5 text-xs text-text-high placeholder-text-low outline-none focus:border-primary transition-colors"
       />
       <label className="flex items-center gap-2 text-[10px] text-text-medium select-none cursor-pointer">
@@ -72,9 +84,14 @@ export function CredentialsPanel({ onKeyIdChange }: CredentialsPanelProps) {
       {credentials.credsSaved && (
         <button
           onClick={copyCredentials}
+          title="Copy the saved credentials"
           className="w-full py-1.5 rounded-md text-xs font-semibold tracking-wide transition-all bg-surface border border-border text-text-high hover:bg-surface-hover"
         >
-          {copyStatus === "copied" ? "copied" : copyStatus === "error" ? "copy failed" : "copy credentials"}
+          {copyStatus === "copied"
+            ? "copied"
+            : copyStatus === "error"
+              ? "copy failed"
+              : "copy credentials"}
         </button>
       )}
     </div>

@@ -22,8 +22,11 @@ interface DragState {
   draggedOverId: string | null;
 }
 
-export function CheckoutBuilder() {
-  const [options, setOptions] = useState<CheckoutOptions>(DEFAULT_CHECKOUT_OPTIONS);
+export function CheckoutBuilder({ initialOrderId = "" }: { initialOrderId?: string }) {
+  const [options, setOptions] = useState<CheckoutOptions>(() => ({
+    ...DEFAULT_CHECKOUT_OPTIONS,
+    order_id: initialOrderId,
+  }));
   const [methods, setMethods] = useState<PaymentMethodConfig[]>(PAYMENT_METHODS);
   const [dragState, setDragState] = useState<DragState>({ draggedId: null, draggedOverId: null });
   const [showTestModal, setShowTestModal] = useState(false);

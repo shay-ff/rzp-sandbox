@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getSession } from "../../../../lib/session";
+import { expireCredentialsIfNeeded, getSession } from "../../../../lib/session";
 import type { RequestHistoryEntry } from "../../../../lib/history";
 import { HISTORY_MAX_ITEMS, HISTORY_RESPONSE_PREVIEW_LIMIT, HISTORY_RESPONSE_SUMMARY_LIMIT } from "../../../../lib/history";
 
@@ -52,6 +52,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const session = await getSession() as any;
+  expireCredentialsIfNeeded(session);
   const incoming = (await req.json()) as RequestHistoryEntry;
   const existingHistory = Array.isArray(session.requestHistory)
     ? session.requestHistory.map(sanitizeEntry)

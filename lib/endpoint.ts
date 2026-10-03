@@ -10,6 +10,14 @@ export interface Endpoint {
     checkoutFields?: string[];
     variants?: { label: string; key: string }[];
     hideBody?: boolean;
+    nextStep?: {
+        endpointId?: string;
+        label: string;
+        responseField: string;
+        target: "body" | "checkout" | "route";
+        targetField: string;
+        route?: string;
+    };
 }
 
 export interface EndpointGroup {
@@ -30,6 +38,13 @@ export const endpointGroups: EndpointGroup[] = [
                     amount: 50000,
                     currency: "INR",
                     receipt: "receipt_001",
+                },
+                nextStep: {
+                    label: "Configure Standard Checkout",
+                    responseField: "id",
+                    target: "route",
+                    targetField: "order_id",
+                    route: "/checkout",
                 },
             },
             {
@@ -187,6 +202,13 @@ export const endpointGroups: EndpointGroup[] = [
                     period: "monthly",
                     interval: 1,
                     item: { name: "Test Plan", amount: 50000, currency: "INR" },
+                },
+                nextStep: {
+                    endpointId: "create_subscription",
+                    label: "Create Subscription",
+                    responseField: "id",
+                    target: "body",
+                    targetField: "plan_id",
                 },
             },
             {
@@ -390,6 +412,13 @@ export const endpointGroups: EndpointGroup[] = [
                         "note_key_2": "Make it so."
                     }
                 },
+                nextStep: {
+                    endpointId: "caw_create_order",
+                    label: "Create Order",
+                    responseField: "id",
+                    target: "body",
+                    targetField: "customer_id",
+                },
             },
             {
                 id: "caw_create_order",
@@ -544,6 +573,13 @@ export const endpointGroups: EndpointGroup[] = [
                         }
                     },
                 },
+                nextStep: {
+                    endpointId: "caw_checkout",
+                    label: "Open Checkout",
+                    responseField: "id",
+                    target: "checkout",
+                    targetField: "order_id",
+                },
             },
             {
                 id: "caw_checkout",
@@ -609,6 +645,13 @@ export const endpointGroups: EndpointGroup[] = [
                     currency: "INR",
                     receipt: "mandate_receipt_001",
                     payment_capture: true,
+                },
+                nextStep: {
+                    endpointId: "caw_checkout",
+                    label: "Open Checkout",
+                    responseField: "id",
+                    target: "checkout",
+                    targetField: "order_id",
                 },
             },
             {

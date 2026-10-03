@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "@/context/AppContext";
 import { HISTORY_GROUPING_OPTIONS, ENDPOINT_METHOD_FILTERS } from "@/lib/utils/constants";
 import type { HistoryGrouping, EndpointMethodFilter } from "@/lib/utils/constants";
@@ -9,13 +9,22 @@ import { METHOD_COLORS } from "@/lib/utils/helpers";
 import { STATUS_COLOR } from "@/lib/utils/helpers";
 
 export function HistoryPanel() {
-  const { history, endpointState } = useApp();
-  const { requestHistory, setRequestHistory, historyOpen, setHistoryOpen, clearRequestHistory } = history;
+  const { history } = useApp();
+  const { requestHistory, historyOpen, setHistoryOpen, clearRequestHistory } = history;
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
   const [historySearch, setHistorySearch] = useState("");
   const [historyGrouping, setHistoryGrouping] = useState<HistoryGrouping>("group");
   const [historyMethodFilter, setHistoryMethodFilter] = useState<EndpointMethodFilter>("ALL");
   const [collapsedHistoryGroups, setCollapsedHistoryGroups] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (!historyOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setHistoryOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [historyOpen, setHistoryOpen]);
 
   const toggleHistoryRow = (id: string) => {
     setExpandedHistoryId((p) => (p === id ? null : id));
@@ -73,10 +82,15 @@ export function HistoryPanel() {
       </button>
 
       {historyOpen && (
-        <div className="mt-3 w-full sm:w-[min(92vw,56rem)] max-h-[85vh] overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-2xl shadow-black/20 backdrop-blur">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="session-history-title"
+          className="mt-3 w-full sm:w-[min(92vw,56rem)] max-h-[85vh] overflow-hidden rounded-2xl border border-border bg-surface/95 shadow-2xl shadow-black/20 backdrop-blur"
+        >
           <div className="flex flex-col items-start gap-3 border-b border-border px-4 py-3 sm:flex-row sm:items-center">
             <div>
-              <h2 className="text-xs tracking-widest text-text-medium uppercase">Session History</h2>
+              <h2 id="session-history-title" className="text-xs tracking-widest text-text-medium uppercase">Session History</h2>
               <p className="text-[10px] text-text-medium">Requests are stored with the saved session</p>
             </div>
             <button
@@ -266,7 +280,9 @@ export function HistoryPanel() {
               </div>
             ) : (
               <div className="rounded-xl border border-dashed border-border bg-surface px-5 py-8 text-sm text-text-medium">
-                No API requests match the current filters.
+                {requestHistory.length
+                  ? "No requests match the current filters."
+                  : "No requests yet. Sent requests will appear here."}
               </div>
             )}
           </div>

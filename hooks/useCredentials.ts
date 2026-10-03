@@ -8,6 +8,7 @@ export function useCredentials() {
   const [showSecret, setShowSecret] = useState(false);
   const [credsSaved, setCredsSaved] = useState(false);
   const [credError, setCredError] = useState("");
+  const hasStoredSecret = credsSaved && !keySecret;
 
   useEffect(() => {
     fetch("/api/session")
@@ -15,9 +16,8 @@ export function useCredentials() {
       .then((data) => {
         if (data.keyId) {
           setKeyId(data.keyId);
-          setCredsSaved(true);
         }
-        if (data.keySecret) setKeySecret(data.keySecret);
+        setCredsSaved(Boolean(data.hasCredentials));
       })
       .catch(() => {});
   }, []);
@@ -50,6 +50,7 @@ export function useCredentials() {
     keyId,
     setKeyId,
     keySecret,
+    hasStoredSecret,
     setKeySecret,
     showSecret,
     setShowSecret,
